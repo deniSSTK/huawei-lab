@@ -38,8 +38,9 @@ All four services have `NET_ADMIN` capability for route or firewall management. 
 
 ## Selected authentication approach
 
-- A local JavaScript frontend at `/login` will provide username and password fields, **Sign in**, and **Continue as guest**.
-- A portal backend will check test accounts stored in SQLite with password hashes and roles: Student, Teacher, or Admin.
+- A local frontend built with plain HTML, CSS, and JavaScript, without a frontend framework, will provide username and password fields, **Sign in**, and **Continue as guest** at `/login`.
+- A Go backend using the standard `net/http` package will handle authentication, sessions, and role lookup. SQLite will store test accounts with password hashes and roles (Student, Teacher, or Admin), together with sessions.
+- The Go application will serve the frontend and API from one `portal` container. The Linux gateway will remain a separate container for routing and firewall enforcement.
 - Successful login will display the account's role. Guest access will remain unauthenticated.
 - The full model will associate a session with a client IP and request network permissions from the gateway. The permission matrix and gateway control interface are still to be designed.
 

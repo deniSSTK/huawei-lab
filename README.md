@@ -41,6 +41,12 @@ After a successful login, the portal displays the user's role: **Student**, **Te
 
 Guest is the default unauthenticated state. Student, Teacher, and Admin are authenticated user roles. Guest, Corporate, and IoT are network segments; roles and segments are separate concepts. Logging in does not move a client into another Docker network.
 
+## Selected technology stack
+
+The planned portal backend will use Go with the standard `net/http` package for HTTP handlers, credential checks, sessions, role lookup, and later gateway integration. The frontend will use plain HTML, CSS, and JavaScript for `/login` and the role page, without a frontend framework. SQLite will store test accounts, password hashes, and sessions.
+
+The Go application will serve both the frontend files and the API from a single `portal` container. Routing and firewall enforcement will remain in the separate Linux gateway container. This stack is selected for future implementation; the portal is not part of the current running model.
+
 ## Components
 
 | Component | Purpose |
