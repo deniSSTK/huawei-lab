@@ -1,5 +1,7 @@
 # Sprint 1: Network Foundation
 
+[Українська версія](sprint-1-ua.md)
+
 ## Goal
 
 Prepare a basic Docker Compose model with separate Guest, Corporate, and IoT segments, record their network parameters, select an approach for modeling role-based access, and agree on the evidence format for subsequent testing.

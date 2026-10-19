@@ -1,5 +1,7 @@
 # University Network Access Control Lab
 
+[Українська версія](README-ua.md)
+
 A Docker Compose proof of concept for separating guest, corporate, and IoT traffic in a university network. A local login portal will identify users, and a Linux gateway will enforce network access rules.
 
 The Sprint 1 network foundation is implemented in [docker-compose.yml](docker-compose.yml): three networks, a Linux gateway, two test clients, and an internal Nginx site. Guest and IoT clients can currently reach the internal site. The portal, authentication, access restrictions, and internet NAT are not implemented. The sections below describe the full target design.
