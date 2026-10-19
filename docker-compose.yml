@@ -1,0 +1,81 @@
+name: university-network
+
+services:
+  gateway:
+    image: alpine:3.22
+    command: ["sleep", "infinity"]
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      guest:
+        ipv4_address: 172.28.10.254
+      corporate:
+        ipv4_address: 172.28.20.254
+      iot:
+        ipv4_address: 172.28.30.254
+
+  guest-client:
+    image: alpine:3.22
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.10.254
+        exec sleep infinity
+    cap_add:
+      - NET_ADMIN
+    networks:
+      guest:
+        ipv4_address: 172.28.10.10
+
+  internal-site:
+    image: nginx:stable-alpine
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.20.254
+        exec nginx -g 'daemon off;'
+    cap_add:
+      - NET_ADMIN
+    networks:
+      corporate:
+        ipv4_address: 172.28.20.10
+
+  iot-client:
+    image: alpine:3.22
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.30.254
+        exec sleep infinity
+    cap_add:
+      - NET_ADMIN
+    networks:
+      iot:
+        ipv4_address: 172.28.30.10
+
+networks:
+  guest:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.10.0/24
+          gateway: 172.28.10.1
+
+  corporate:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.20.0/24
+          gateway: 172.28.20.1
+
+  iot:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.30.0/24
+          gateway: 172.28.30.1

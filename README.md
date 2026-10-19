@@ -2,7 +2,34 @@
 
 A Docker Compose proof of concept for separating guest, corporate, and IoT traffic in a university network. A local login portal will identify users, and a Linux gateway will enforce network access rules.
 
-This repository currently describes the proposed design. The components and behavior below are implementation targets, not features already delivered.
+The Sprint 1 network foundation is implemented in [docker-compose.yml](docker-compose.yml): three networks, a Linux gateway, two test clients, and an internal Nginx site. Guest and IoT clients can currently reach the internal site. The portal, authentication, access restrictions, and internet NAT are not implemented. The sections below describe the full target design.
+
+## Running the current network model
+
+With Docker and Docker Compose available, run from the repository root:
+
+```bash
+docker compose config --quiet
+docker compose up -d
+docker compose ps
+```
+
+Check access to the internal site from each client:
+
+```bash
+docker compose exec guest-client wget -qO- http://172.28.20.10
+docker compose exec iot-client wget -qO- http://172.28.20.10
+```
+
+Both requests should return the Nginx welcome page at this stage. These checks demonstrate baseline connectivity; no inter-segment isolation rules are configured yet. The site has no published host port, so these commands access it from inside the lab networks.
+
+Stop and remove the lab containers and networks with:
+
+```bash
+docker compose down
+```
+
+See [Sprint 1](sprints/sprint-1.md) for addresses, routing details, and recorded validation results.
 
 ## Project idea
 
@@ -37,7 +64,7 @@ Guest network                       Corporate network
 
 The portal must be reachable before authentication. Traffic from clients to internal resources must pass through the gateway. Client and resource containers must not share an alternative network that bypasses it. Internet traffic must also use the gateway when testing guest internet access.
 
-Docker Compose will assign fixed IP addresses to lab clients. Subnets, addresses, routes, and forwarding settings will be selected during the network setup. The gateway needs permission to manage forwarding and firewall rules.
+Docker Compose assigns fixed IP addresses to lab clients. The current subnets, addresses, and routes are recorded in [Sprint 1](sprints/sprint-1.md). The gateway has `NET_ADMIN` capability and IPv4 forwarding enabled. Internet uplink behavior and NAT remain to be configured and tested.
 
 This is a virtual network model. No physical Wi-Fi access point is required. Users open the portal explicitly; automatic captive-portal detection and redirection are outside the initial design.
 
