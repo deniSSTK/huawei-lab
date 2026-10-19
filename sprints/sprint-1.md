@@ -45,15 +45,6 @@ All four services have `NET_ADMIN` capability for route or firewall management. 
 
 This sprint selects the approach; no portal, database, login session, or role-based firewall integration has been implemented.
 
-## Validation in this sprint
-
-- Validate the Docker Compose configuration and start the foundation containers.
-- Check that each container is attached to the intended network and has the expected IP address.
-- Inspect the gateway interfaces and routing configuration.
-- Record the results of the checks actually performed.
-
-These checks establish the topology. They do not establish that guest isolation or role-based network enforcement works.
-
 ## Scope boundaries
 
 The required role work in this sprint is to select and describe the implementation approach. A working login page that displays a role is an optional extension, not a prerequisite for completing the network foundation.
@@ -65,8 +56,6 @@ The following are later implementation targets:
 - Updating gateway permissions after login.
 - Revoking permissions on logout or session expiry.
 - Demonstrating distinct network permissions for authenticated roles.
-
-No separate report document is planned in this repository. Project explanation and sprint scope are maintained in Markdown.
 
 ## Validation results and evidence
 
@@ -83,13 +72,6 @@ Validation was performed by the project author in a local Docker environment on 
 | NET-07 | `docker compose exec iot-client wget -qO- http://172.28.20.10` | Nginx welcome page returned. | HTML containing `Welcome to nginx!` returned. | PASS | Terminal output pasted in chat. |
 
 Guest and IoT access to Corporate is expected for this unrestricted baseline. These results do not demonstrate authentication, isolation, or internet access.
-
-Use the following format for additional checks:
-
-| Check ID | Action / command | Expected result | Actual result | PASS / FAIL | Log / screenshot reference |
-| --- | --- | --- | --- | --- | --- |
-
-Populate evidence only after running a check. Unexecuted checks must not be reported as passing.
 
 ## Open decisions
 
