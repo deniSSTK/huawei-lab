@@ -1,0 +1,124 @@
+user@macbook huawei-lab % docker compose up -d --build --wait huawei-lab % docker compose up -d --build --wait
+
+[+] Building 2.4s (10/10) FINISHED                                                                                                                                              
+ => [internal] load local bake definitions                                                                                                                                 0.0s
+ => => reading from stdin 590B                                                                                                                                             0.0s
+ => [internal] load build definition from Dockerfile                                                                                                                       0.1s
+ => => transferring dockerfile: 210B                                                                                                                                       0.0s
+ => [internal] load metadata for docker.io/library/alpine:3.22                                                                                                             0.0s
+ => [internal] load .dockerignore                                                                                                                                          0.1s
+ => => transferring context: 2B                                                                                                                                            0.0s
+ => [1/3] FROM docker.io/library/alpine:3.22                                                                                                                               0.0s
+ => [internal] load build context                                                                                                                                          0.1s
+ => => transferring context: 262B                                                                                                                                          0.0s
+ => [2/3] RUN apk add --no-cache nftables                                                                                                                                  1.8s
+ => [3/3] COPY entrypoint.sh /usr/local/bin/gateway-entrypoint.sh                                                                                                          0.1s 
+ => exporting to image                                                                                                                                                     0.1s
+ => => exporting layers                                                                                                                                                    0.1s 
+ => => writing image sha256:6a5868ca0fdb0cfbe642f82ec8bb9751bcd123df285054c1f66f0ff0c8a3a8fe                                                                               0.0s 
+ => => naming to docker.io/library/university-network-gateway                                                                                                              0.0s 
+ => resolving provenance for metadata file                                                                                                                                 0.0s 
+[+] up 5/5                                                                                                                                                                      
+ ✔ Image university-network-gateway             Built                                                                                                                       2.5s
+ ✔ Container university-network-gateway-1       Healthy                                                                                                                     3.4s
+ ✔ Container university-network-iot-client-1    Healthy                                                                                                                     0.7s
+ ✔ Container university-network-guest-client-1  Healthy                                                                                                                     0.7s
+ ✔ Container university-network-internal-site-1 Healthy                                                                                                                     0.7s
+user@macbook huawei-lab % sh scripts/check-isolation.sh
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+PASS: Internal Site responds inside Corporate
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+PASS: Gateway reaches Internal Site
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.125 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.125/0.125/0.125 ms
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.111 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.111/0.111/0.111 ms
+wget: download timed out
+PASS: guest-client blocked; guest_to_corporate packets 0 -> 3
+wget: download timed out
+PASS: iot-client blocked; iot_to_corporate packets 0 -> 3
+table inet lab_filter {
+        counter guest_to_corporate {
+                packets 3 bytes 180
+        }
+
+        counter iot_to_corporate {
+                packets 3 bytes 180
+        }
+
+        counter default_deny {
+                packets 0 bytes 0
+        }
+
+        chain forward {
+                type filter hook forward priority filter; policy drop;
+                ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
+                ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
+                ct state invalid drop
+                ct state established,related accept
+                counter name "default_deny" drop
+        }
+}
+user@macbook huawei-lab % 

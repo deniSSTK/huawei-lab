@@ -4,34 +4,30 @@
 
 A Docker Compose proof of concept for separating guest, corporate, and IoT traffic in a university network. A local login portal will identify users, and a Linux gateway will enforce network access rules.
 
-The Sprint 1 network foundation is implemented in [docker-compose.yml](docker-compose.yml): three networks, a Linux gateway, two test clients, and an internal Nginx site. Guest and IoT clients can currently reach the internal site. The portal, authentication, access restrictions, and internet NAT are not implemented. The sections below describe the full target design.
+The current Sprint 2 foundation adds a gateway Firewall to the Sprint 1 Docker Compose topology. Guest and IoT requests to Corporate are blocked; forwarding uses Default Deny. The portal, authentication, role-based grants, and internet NAT remain future work. Initial build and isolation checks passed in the author-provided terminal output on 26 October 2026; restart and recreation checks remain pending.
 
 ## Running the current network model
 
-With Docker and Docker Compose available, run from the repository root:
+With Docker running and Docker Compose available, run from the repository root:
 
 ```bash
 docker compose config --quiet
-docker compose up -d
-docker compose ps
+docker compose up -d --build --wait
+sh scripts/check-isolation.sh
 ```
 
-Check access to the internal site from each client:
+The check verifies that Nginx responds, the gateway reaches the site, both clients reach their gateway, and Guest/IoT requests to `172.28.20.10` fail while the corresponding Firewall drop counters increase. Expected request timeouts are part of successful isolation checks. No host port is published.
+
+Check that isolation survives container recreation:
 
 ```bash
-docker compose exec guest-client wget -qO- http://172.28.20.10
-docker compose exec iot-client wget -qO- http://172.28.20.10
+docker compose up -d --force-recreate --wait
+sh scripts/check-isolation.sh
 ```
 
-Both requests should return the Nginx welcome page at this stage. These checks demonstrate baseline connectivity; no inter-segment isolation rules are configured yet. The site has no published host port, so these commands access it from inside the lab networks.
+The gateway becomes ready only after the nftables configuration loads. The other services wait for the gateway healthcheck during Compose startup. Configuration changes are loaded on restart; rebuild the gateway when its Dockerfile or entrypoint changes.
 
-Stop and remove the lab containers and networks with:
-
-```bash
-docker compose down
-```
-
-See [Sprint 1](sprints/sprint-1.md) for addresses, routing details, and recorded validation results.
+Stop the lab with `docker compose down`. See [Sprint 2](sprints/sprint-2.md) for the Firewall policy, manual checks, and teammate tasks. [Sprint 1](sprints/sprint-1.md) preserves the original unrestricted baseline and its historical validation results.
 
 ## Project idea
 
@@ -55,7 +51,7 @@ The Go application will serve both the frontend files and the API from a single 
 | Portal frontend | A JavaScript interface at `/login`, followed by a page showing the current role. |
 | Portal backend | Checks credentials, creates sessions, associates a client IP with a user and role, and requests gateway permission changes. |
 | SQLite database | Stores test accounts, password hashes, roles, and active session records. Plain-text passwords are not stored. |
-| Gateway / firewall | A Linux container that routes traffic between segments and enforces rules, provisionally using `nftables`. |
+| Gateway / firewall | A Linux container that routes traffic between segments and enforces rules, using `nftables`. |
 | Internal resource | A separate university website in Corporate. A static page served by Nginx is sufficient to demonstrate network access control; a separate application backend is optional. |
 | IoT client | A container used to test the isolation of IoT devices from Corporate services. |
 
@@ -72,7 +68,7 @@ Guest network                       Corporate network
 
 The portal must be reachable before authentication. Traffic from clients to internal resources must pass through the gateway. Client and resource containers must not share an alternative network that bypasses it. Internet traffic must also use the gateway when testing guest internet access.
 
-Docker Compose assigns fixed IP addresses to lab clients. The current subnets, addresses, and routes are recorded in [Sprint 1](sprints/sprint-1.md). The gateway has `NET_ADMIN` capability and IPv4 forwarding enabled. Internet uplink behavior and NAT remain to be configured and tested.
+Docker Compose assigns fixed IP addresses to lab clients. The current subnets, addresses, and routes are recorded in [Sprint 1](sprints/sprint-1.md). The gateway has `NET_ADMIN` capability and IPv4 forwarding enabled by Docker Compose. Internet uplink behavior and NAT remain to be configured and tested.
 
 This is a virtual network model. No physical Wi-Fi access point is required. Users open the portal explicitly; automatic captive-portal detection and redirection are outside the initial design.
 
@@ -135,5 +131,6 @@ Sprint scope is kept separately from the overall design:
 
 - [Sprint overview](sprints/README.md)
 - [Sprint 1: network foundation](sprints/sprint-1.md)
+- [Sprint 2: Firewall foundation](sprints/sprint-2.md)
 
-The full design above spans multiple sprints. Sprint 1 establishes the network foundation and selects the role-modeling approach. Inter-segment isolation tests and automatic firewall changes after login are subsequent work.
+The full design above spans multiple sprints. Sprint 1 establishes the network foundation and selects the role-modeling approach. Sprint 2 adds the Firewall foundation and isolation checks. Automatic firewall changes after login remain subsequent work.
