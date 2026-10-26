@@ -1,0 +1,183 @@
+
+$ env TZ=Europe/Kiev date +%Y-%m-%dT%H:%M:%S%z
+2026-10-26T23:45:32+0200
+
+exit_status=0
+
+$ uname -a
+Darwin lab-host 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:03 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8132 arm64
+
+exit_status=0
+
+$ sw_vers
+ProductName:		macOS
+ProductVersion:		26.6.2
+BuildVersion:		25G83
+
+exit_status=0
+
+$ git rev-parse HEAD
+cd5537828a1fa527e9679fd27819df008a4b2eaf
+
+exit_status=0
+
+$ git status --short
+A  evidence/sprint-2/2026-10-26_23-44-35-isolation/01-initial.log
+A  evidence/sprint-2/2026-10-26_23-44-35-isolation/02-restart.log
+A  evidence/sprint-2/2026-10-26_23-44-35-isolation/environment.log
+A  scripts/collect-isolation-evidence.sh
+?? evidence/sprint-2/2026-10-26_23-45-32-isolation/
+
+exit_status=0
+
+$ shasum -a 256 docker-compose.yml gateway/Dockerfile gateway/entrypoint.sh gateway/nftables.conf scripts/check-isolation.sh
+443b42af3e0848ab3cf5296ca35d885649cdaece0d83e5945b8867adff904e3e  docker-compose.yml
+79afa53249e99728149094f0fa463a52b939abb28d94dba6868bc20859f63d16  gateway/Dockerfile
+e4c4e30af2f9a3371ecd43d8f4c9294a7084971ed2472001c3811e8ad3d477b4  gateway/entrypoint.sh
+d073c9e7034438c444beddfd1cf21664553c0e98038063f92916abe0a120fdfe  gateway/nftables.conf
+f51f1f3d425d7cbbc03320979fbc79e0853c38d51a623196981d79e823eb22e2  scripts/check-isolation.sh
+
+exit_status=0
+
+$ docker version
+Client:
+ Version:           29.4.0
+ API version:       1.54
+ Go version:        go1.26.4
+ Git commit:        9d7ad9f
+ Built:             Fri Aug  7 04:38:56 2026
+ OS/Arch:           darwin/arm64
+ Context:           orbstack
+
+Server: Docker Engine - Community
+ Engine:
+  Version:          29.4.0
+  API version:      1.54 (minimum version 1.40)
+  Go version:       go1.26.1
+  Git commit:       daa0cb7f
+  Built:            Tue Apr  7 08:35:43 2026
+  OS/Arch:          linux/arm64
+  Experimental:     true
+ containerd:
+  Version:          v2.2.2
+  GitCommit:        301b2dac98f15c27117da5c8af12118a041a31d9
+ runc:
+  Version:          1.5.1
+  GitCommit:        bb14dabeb7185bb72c8c86735d090dcb20f36587
+ docker-init:
+  Version:          0.19.0
+  GitCommit:        de40ad0
+
+exit_status=0
+
+$ docker compose version
+Docker Compose version v5.1.2
+
+exit_status=0
+
+$ docker compose config
+name: university-network
+services:
+  gateway:
+    build:
+      context: /workspace/huawei-lab/gateway
+      dockerfile: Dockerfile
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test $$(cat /proc/sys/net/ipv4/ip_forward) = 1 && nft list chain inet lab_filter forward >/dev/null
+      timeout: 2s
+      interval: 2s
+      retries: 10
+    networks:
+      corporate:
+        ipv4_address: 172.28.20.254
+      guest:
+        ipv4_address: 172.28.10.254
+      iot:
+        ipv4_address: 172.28.30.254
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    volumes:
+      - type: bind
+        source: /workspace/huawei-lab/gateway/nftables.conf
+        target: /etc/nftables.conf
+        read_only: true
+        bind: {}
+  guest-client:
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.10.254
+        exec sleep infinity
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    image: alpine:3.22
+    networks:
+      guest:
+        ipv4_address: 172.28.10.10
+  internal-site:
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.20.254
+        exec nginx -g 'daemon off;'
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    image: nginx:stable-alpine
+    networks:
+      corporate:
+        ipv4_address: 172.28.20.10
+  iot-client:
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.30.254
+        exec sleep infinity
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    image: alpine:3.22
+    networks:
+      iot:
+        ipv4_address: 172.28.30.10
+networks:
+  corporate:
+    name: university-network_corporate
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.20.0/24
+          gateway: 172.28.20.1
+  guest:
+    name: university-network_guest
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.10.0/24
+          gateway: 172.28.10.1
+  iot:
+    name: university-network_iot
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.30.0/24
+          gateway: 172.28.30.1
+
+exit_status=0

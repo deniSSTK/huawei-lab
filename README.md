@@ -4,7 +4,7 @@
 
 A Docker Compose proof of concept for separating guest, corporate, and IoT traffic in a university network. A local login portal will identify users, and a Linux gateway will enforce network access rules.
 
-The current Sprint 2 foundation adds a gateway Firewall to the Sprint 1 Docker Compose topology. Guest and IoT requests to Corporate are blocked; forwarding uses Default Deny. The portal, authentication, role-based grants, and internet NAT remain future work. Initial build and isolation checks passed in the author-provided terminal output on 26 October 2026; restart and recreation checks remain pending.
+The current Sprint 2 foundation adds a gateway Firewall to the Sprint 1 Docker Compose topology. Guest and IoT requests to Corporate are blocked; forwarding uses Default Deny. The portal, authentication, role-based grants, and internet NAT remain future work. Build and isolation checks passed on 26 October 2026, including after gateway restart and container recreation. See the [recorded results and logs](evidence/sprint-2/results.md).
 
 ## Running the current network model
 

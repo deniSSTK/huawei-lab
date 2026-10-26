@@ -1,4 +1,4 @@
-user@macbook huawei-lab % docker compose up -d --build --wait huawei-lab % docker compose up -d --build --wait
+user@lab-host huawei-lab % docker compose up -d --build --wait huawei-lab % docker compose up -d --build --wait
 
 [+] Building 2.4s (10/10) FINISHED                                                                                                                                              
  => [internal] load local bake definitions                                                                                                                                 0.0s
@@ -24,7 +24,7 @@ user@macbook huawei-lab % docker compose up -d --build --wait huawei-lab % docke
  ✔ Container university-network-iot-client-1    Healthy                                                                                                                     0.7s
  ✔ Container university-network-guest-client-1  Healthy                                                                                                                     0.7s
  ✔ Container university-network-internal-site-1 Healthy                                                                                                                     0.7s
-user@macbook huawei-lab % sh scripts/check-isolation.sh
+user@lab-host huawei-lab % sh scripts/check-isolation.sh
 <!DOCTYPE html>
 <html>
 <head>
@@ -121,4 +121,4 @@ table inet lab_filter {
                 counter name "default_deny" drop
         }
 }
-user@macbook huawei-lab % 
+user@lab-host huawei-lab % 
