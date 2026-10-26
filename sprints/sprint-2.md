@@ -67,4 +67,6 @@ The project author supplied terminal output on 26 October 2026. The gateway imag
 | Guest to Internal Site | HTTP timeout; guest_to_corporate packets increased from 0 to 3. | PASS |
 | IoT to Internal Site | HTTP timeout; iot_to_corporate packets increased from 0 to 3. | PASS |
 
-These are author-run results preserved from the supplied output, not an independent rerun. Restart/recreation checks, Guest internet configuration and verification, and terminal screenshots remain pending. Freeze readiness is not established by this initial run alone.
+The table above preserves the author's initial run. A new complete run on 26 October 2026 also passed after gateway restart and recreation of all four containers. The site and gateway remained reachable; Guest/IoT requests were blocked with increasing Firewall counters at every stage. See [the full results, environment and logs](../evidence/sprint-2/results.md). Repeat the collection with `sh scripts/collect-isolation-evidence.sh`.
+
+Guest internet configuration and verification remain a separate participant's work. Terminal screenshots remain pending; the recorded evidence consists of actual command output. These checks verify isolation after readiness, not uninterrupted blocking during recreation. Overall Freeze readiness still requires the remaining requirements and team record.
