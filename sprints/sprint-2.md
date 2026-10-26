@@ -4,15 +4,18 @@
 
 ## Goal and scope
 
-Extend the Sprint 1 topology with repeatable Guest-to-Corporate and IoT-to-Corporate isolation. This implements the Firewall foundation for R-02, R-07 and D-01 from the supplied Sprint 2 template. Initial runtime evidence is recorded below; this is not a completed Sprint 2 Record or Implementation Freeze decision.
+Extend the Sprint 1 topology with repeatable Guest-to-Corporate and IoT-to-Corporate isolation and Guest web access through the gateway. This implements the network foundation for R-01, R-02, R-07 and D-01 from the supplied templates. The final Lab 13 Sprint 2 Record will be prepared after the baseline commit and screenshots; the Implementation Freeze decision belongs to Lab 14.
 
 ## Implementation
 
 - `gateway/Dockerfile` installs nftables at image build time.
-- `gateway/nftables.conf` owns only the `inet lab_filter` table. Loading it again replaces its rules atomically without flushing other tables, such as future NAT configuration.
+- `client/Dockerfile` adds curl and CA certificates to Guest for verified HTTPS checks.
+- `gateway/nftables.conf` owns `inet lab_filter`; `gateway/nat.conf` owns `ip lab_nat`. The entrypoint loads both tables atomically without flushing unrelated tables or accumulating duplicate rules.
+- Only the gateway joins uplink `172.28.40.0/24` at `172.28.40.254`. Its default route uses Docker's `172.28.40.1`, selected by `gw_priority: 1` (Compose 2.33.1+). The entrypoint resolves the interface by its IP, not an assumed `eth0` name.
 - Docker Compose enables IPv4 forwarding. The entrypoint loads the rules before the gateway becomes healthy; configuration failure stops the gateway. Other services wait for its healthcheck on Compose startup. This startup ordering is not an atomic fail-closed guarantee during gateway recreation while existing clients are running; validate the policy after recreation before resuming tests.
 - Guest (`172.28.10.0/24`) and IoT (`172.28.30.0/24`) packets to Corporate (`172.28.20.0/24`) are dropped before the established/related rule. Named counters identify the two restrictions.
-- Other established/related traffic is accepted; all other forwarded traffic is dropped. No new inter-zone or internet connections are allowed in this foundation. Gateway-local input/output is unchanged, so clients can ping their gateway and the gateway can check Nginx directly.
+- Guest may forward TCP 80/443 and UDP/TCP 53 through the uplink. `guest_to_internet` counts web traffic; `guest_dns` counts forwarded DNS. Guest source addresses are masqueraded on the uplink, with return packets allowed by established/related. Other new traffic, including IoT internet, is dropped. Gateway-local input/output is unchanged, so clients can ping their gateway and the gateway can check Nginx directly.
+- Docker's embedded DNS may resolve domains separately. Internet checks verify real HTTP/HTTPS responses from `example.com` and an increasing gateway web counter, with proxies disabled, IPv4 forced, certificate verification, and bounded timeouts.
 
 The rules apply inside the gateway container, not to the host Firewall. This remains a trusted-client lab: client containers retain `NET_ADMIN` for route setup. It does not protect against a participant deliberately changing routes or spoofing an IP.
 
@@ -23,10 +26,14 @@ docker compose config --quiet
 docker compose up -d --build --wait
 docker compose ps
 sh scripts/check-isolation.sh
+sh scripts/check-internet.sh
 docker compose restart gateway
+docker compose up -d --wait
 sh scripts/check-isolation.sh
+sh scripts/check-internet.sh
 docker compose up -d --force-recreate --wait
 sh scripts/check-isolation.sh
+sh scripts/check-internet.sh
 ```
 
 The script fails unless the internal server and paths to the gateway work, both internal HTTP requests fail, and each named Firewall counter increases. A timeout alone is not accepted as evidence of isolation. Stop other client traffic during the check so counters identify the test requests.
@@ -46,27 +53,18 @@ docker compose exec gateway nft list table inet lab_filter
 
 The two client HTTP commands should fail; the server and gateway HTTP commands should succeed. Compare Firewall counters before and after the client requests.
 
-## Teammate handoff
-
-Detailed Ukrainian implementation briefs: [Sprint 2 handoff](sprint-2-handoff-ua.md).
-
-1. **Guest internet:** configure routing, explicit Guest internet forwarding, return traffic, and NAT on the gateway. Preserve the Corporate restrictions and Default Deny. Add a separate NAT table so reloading `lab_filter` does not erase NAT. Verify an external request originating from `guest-client`; a gateway-only request does not prove Guest access. Keep DNS and Docker's embedded resolver behavior in mind when recording the path.
-2. **Validation and evidence:** run the controls and isolation checks, then repeat after restart and recreation. After teammate 1 finishes, verify Guest internet too. Store actual terminal output/screenshots under `evidence/sprint-2/`, with command, expected result, actual result, PASS/FAIL, and evidence path. Record defects with reproduction steps.
-
-Auth Portal implementation and automatic role grants remain outside this foundation. Finalize the portal description and role matrix separately; do not mark authentication requirements READY based on this Firewall alone.
-
 ## Validation state
 
-The project author supplied terminal output on 26 October 2026. The gateway image built successfully, Compose startup completed with the gateway healthy, and the loaded nftables table shows the intended rules. Evidence: [initial terminal output](../evidence/sprint-2/initial-isolation-2026-10-26.txt).
+The integrated checks passed on 27 October 2026 after startup, gateway restart and recreation of all containers: Nginx and the gateways respond, Guest/IoT requests to Corporate are blocked with increasing drop counters, and Guest receives HTTP/HTTPS responses through the gateway. See the single [results report with environment and logs](../evidence/sprint-2/results.md). Repeat collection with `sh scripts/collect-isolation-evidence.sh`.
 
-| Check | Actual result | Status |
-| --- | --- | --- |
-| Internal Site in Corporate | Nginx welcome page returned. | PASS |
-| Gateway to Internal Site | Nginx welcome page returned. | PASS |
-| Guest and IoT to their gateway | Each ping returned 1/1 replies with 0% loss. | PASS |
-| Guest to Internal Site | HTTP timeout; guest_to_corporate packets increased from 0 to 3. | PASS |
-| IoT to Internal Site | HTTP timeout; iot_to_corporate packets increased from 0 to 3. | PASS |
+The [portal description and planned role matrix](../docs/auth-portal-ua.md) are documented. Portal implementation and automatic role grants remain future work. Evidence currently consists of actual command output; screenshots remain to be added for submission. Checks confirm isolation after readiness, not uninterrupted blocking during recreation. Cross-host portability has not been tested; the recorded run used OrbStack on macOS.
 
-The table above preserves the author's initial run. A new complete run on 26 October 2026 also passed after gateway restart and recreation of all four containers. The site and gateway remained reachable; Guest/IoT requests were blocked with increasing Firewall counters at every stage. See [the full results, environment and logs](../evidence/sprint-2/results.md). Repeat the collection with `sh scripts/collect-isolation-evidence.sh`.
+## Lab 14 Implementation Freeze
 
-Guest internet configuration and verification remain a separate participant's work. Terminal screenshots remain pending; the recorded evidence consists of actual command output. These checks verify isolation after readiness, not uninterrupted blocking during recreation. Overall Freeze readiness still requires the remaining requirements and team record.
+1. Commit the final version, run `git rev-parse HEAD`, and record its full SHA and date in the Freeze Record.
+2. Run a short smoke check of that commit: `docker compose up -d --build --wait`, `docker compose ps`, `sh scripts/check-isolation.sh`, `sh scripts/check-internet.sh`. Save the output. Repeat the full restart/recreation checks if network code changes or the smoke check fails.
+3. Fill the supplied Freeze Record with the baseline, requirement readiness, smoke results, known issues and testing handoff. Each participant completes their own Contribution Log #4 using their actual contribution.
+
+R-01 is ready within the verified Guest web scope; R-02 and R-07 are ready for the tested Corporate HTTP restrictions. R-04 has a completed description but a missing implementation; R-08 still has a gap for dynamic role-based access. Match the exact requirement wording against the team's Requirements document.
+
+After a successful smoke check, use `READY WITH KNOWN ISSUES` for network testing; use `HOLD` if the check fails. Start Lab 15 with TC-01 (Guest internet), TC-02 (Guest restriction), and TC-07 (IoT restriction). Login, role, logout and session-expiry tests remain blocked until the portal and gateway integration exist.

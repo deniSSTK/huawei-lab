@@ -1,85 +1,46 @@
-$ docker compose config --quiet
+
+$ docker compose restart gateway
+ Container university-network-gateway-1 Restarting 
+ Container university-network-gateway-1 Started 
 
 exit_status=0
 
-$ docker compose up -d --build --wait --wait-timeout 60
- Image university-network-gateway Building 
-#1 [internal] load local bake definitions
-#1 reading from stdin 590B done
-#1 DONE 0.0s
-
-#2 [internal] load build definition from Dockerfile
-#2 transferring dockerfile: 210B done
-#2 DONE 0.0s
-
-#3 [internal] load metadata for docker.io/library/alpine:3.22
-#3 DONE 0.0s
-
-#4 [internal] load .dockerignore
-#4 transferring context: 2B done
-#4 DONE 0.0s
-
-#5 [1/3] FROM docker.io/library/alpine:3.22
-#5 DONE 0.0s
-
-#6 [internal] load build context
-#6 transferring context: 35B done
-#6 DONE 0.0s
-
-#7 [2/3] RUN apk add --no-cache nftables
-#7 CACHED
-
-#8 [3/3] COPY entrypoint.sh /usr/local/bin/gateway-entrypoint.sh
-#8 CACHED
-
-#9 exporting to image
-#9 exporting layers done
-#9 writing image sha256:6a5868ca0fdb0cfbe642f82ec8bb9751bcd123df285054c1f66f0ff0c8a3a8fe done
-#9 naming to docker.io/library/university-network-gateway done
-#9 DONE 0.0s
-
-#10 resolving provenance for metadata file
-#10 DONE 0.0s
- Image university-network-gateway Built 
- Container university-network-gateway-1 Starting 
- Container university-network-gateway-1 Started 
+$ docker compose up -d --wait --wait-timeout 60
+ Container university-network-gateway-1 Running 
+ Container university-network-guest-client-1 Running 
+ Container university-network-internal-site-1 Running 
+ Container university-network-iot-client-1 Running 
  Container university-network-gateway-1 Waiting 
  Container university-network-gateway-1 Waiting 
  Container university-network-gateway-1 Waiting 
  Container university-network-gateway-1 Healthy 
- Container university-network-iot-client-1 Starting 
  Container university-network-gateway-1 Healthy 
- Container university-network-guest-client-1 Starting 
  Container university-network-gateway-1 Healthy 
- Container university-network-internal-site-1 Starting 
- Container university-network-iot-client-1 Started 
- Container university-network-guest-client-1 Started 
- Container university-network-internal-site-1 Started 
+ Container university-network-gateway-1 Waiting 
  Container university-network-guest-client-1 Waiting 
  Container university-network-internal-site-1 Waiting 
  Container university-network-iot-client-1 Waiting 
- Container university-network-gateway-1 Waiting 
- Container university-network-internal-site-1 Healthy 
- Container university-network-gateway-1 Healthy 
  Container university-network-iot-client-1 Healthy 
  Container university-network-guest-client-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-internal-site-1 Healthy 
 
 exit_status=0
 
 $ docker compose ps
-NAME                                 IMAGE                        COMMAND                  SERVICE         CREATED       STATUS                   PORTS
-university-network-gateway-1         university-network-gateway   "/bin/sh /usr/local/…"   gateway         4 hours ago   Up 3 seconds (healthy)   
-university-network-guest-client-1    alpine:3.22                  "sh -c 'ip route rep…"   guest-client    7 days ago    Up Less than a second    
-university-network-internal-site-1   nginx:stable-alpine          "/docker-entrypoint.…"   internal-site   7 days ago    Up Less than a second    80/tcp
-university-network-iot-client-1      alpine:3.22                  "sh -c 'ip route rep…"   iot-client      7 days ago    Up Less than a second    
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED          STATUS                   PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         46 seconds ago   Up 2 seconds (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    35 seconds ago   Up 22 seconds            
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   14 minutes ago   Up 14 minutes            80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      14 minutes ago   Up 14 minutes            
 
 exit_status=0
 
 $ docker compose ps -q
-bc7e7d1b42a935d3e2eaee89fc17498d11571a5a77188c4b2e3d63a8c6a63d8e
-503e3496f633c68a0a10d84cec94c2e7a131a3bc8139aabdac6909fc99890802
-f28086e2c965fdcf4caa39655ecdd730b24867c20375d213b3f427e813346a4b
-107ba2cd72c088d13fde9e8418da98506ee6f170533cb64146b877630c80d2bb
+c6ac8990343ffa0d7a2568a9aef19993aed388e51ac09dec40e72e41be260d41
+11f802178d4de4d4a233d54340f86c3ca99c9cb32e73cf932bacac5d66078042
+064ff13d1753077d6d838e9d4f7a35a5d4df69edf513dfdfb022245f5ff02f9a
+3fe246a052ad5edbdd71f54a21b6fdfaa1f877d9df28919ec8df7b49d848ad29
 
 exit_status=0
 
@@ -166,17 +127,17 @@ security features and capabilities please refer to
 
 PASS: Gateway reaches Internal Site
 PING 172.28.10.254 (172.28.10.254): 56 data bytes
-64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.220 ms
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.115 ms
 
 --- 172.28.10.254 ping statistics ---
 1 packets transmitted, 1 packets received, 0% packet loss
-round-trip min/avg/max = 0.220/0.220/0.220 ms
+round-trip min/avg/max = 0.115/0.115/0.115 ms
 PING 172.28.30.254 (172.28.30.254): 56 data bytes
-64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.185 ms
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.083 ms
 
 --- 172.28.30.254 ping statistics ---
 1 packets transmitted, 1 packets received, 0% packet loss
-round-trip min/avg/max = 0.185/0.185/0.185 ms
+round-trip min/avg/max = 0.083/0.083/0.083 ms
 wget: download timed out
 PASS: guest-client blocked; guest_to_corporate packets 0 -> 3
 wget: download timed out
@@ -190,6 +151,14 @@ table inet lab_filter {
 		packets 3 bytes 180
 	}
 
+	counter guest_to_internet {
+		packets 0 bytes 0
+	}
+
+	counter guest_dns {
+		packets 0 bytes 0
+	}
+
 	counter default_deny {
 		packets 0 bytes 0
 	}
@@ -199,8 +168,37 @@ table inet lab_filter {
 		ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
 		ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
 		ct state invalid drop
+		ip saddr 172.28.10.0/24 oifname "eth0" tcp dport { 80, 443 } counter name "guest_to_internet" accept
+		ip saddr 172.28.10.0/24 oifname "eth0" udp dport 53 counter name "guest_dns" accept
+		ip saddr 172.28.10.0/24 oifname "eth0" tcp dport 53 counter name "guest_dns" accept
 		ct state established,related accept
 		counter name "default_deny" drop
+	}
+}
+
+exit_status=0
+
+$ sh scripts/check-internet.sh
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+PASS: Guest default route uses the lab Gateway
+default via 172.28.40.1 dev eth0 
+172.28.10.0/24 dev eth2 scope link  src 172.28.10.254 
+172.28.20.0/24 dev eth1 scope link  src 172.28.20.254 
+172.28.30.0/24 dev eth3 scope link  src 172.28.30.254 
+172.28.40.0/24 dev eth0 scope link  src 172.28.40.254 
+PASS: Gateway default route uses the uplink
+PASS: Guest fetched http://example.com/ (Example Domain); guest_to_internet packets 0 -> 6
+PASS: Guest fetched https://example.com/ (Example Domain); guest_to_internet packets 6 -> 19
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 19 bytes 2947
+	}
+}
+table ip lab_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.28.10.0/24 oifname "eth0" counter packets 2 bytes 120 masquerade
 	}
 }
 

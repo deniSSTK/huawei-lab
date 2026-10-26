@@ -5,12 +5,13 @@ services:
     build: ./gateway
     volumes:
       - ./gateway/nftables.conf:/etc/nftables.conf:ro
+      - ./gateway/nat.conf:/etc/nat.conf:ro
     cap_add:
       - NET_ADMIN
     sysctls:
       net.ipv4.ip_forward: "1"
     healthcheck:
-      test: ["CMD-SHELL", "test $$(cat /proc/sys/net/ipv4/ip_forward) = 1 && nft list chain inet lab_filter forward >/dev/null"]
+      test: ["CMD-SHELL", "test $$(cat /proc/sys/net/ipv4/ip_forward) = 1 && nft list chain inet lab_filter forward >/dev/null && nft list chain ip lab_nat postrouting >/dev/null"]
       interval: 2s
       timeout: 2s
       retries: 10
@@ -21,9 +22,12 @@ services:
         ipv4_address: 172.28.20.254
       iot:
         ipv4_address: 172.28.30.254
+      uplink:
+        ipv4_address: 172.28.40.254
+        gw_priority: 1
 
   guest-client:
-    image: alpine:3.22
+    build: ./client
     depends_on:
       gateway:
         condition: service_healthy
@@ -94,3 +98,10 @@ networks:
       config:
         - subnet: 172.28.30.0/24
           gateway: 172.28.30.1
+
+  uplink:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.40.0/24
+          gateway: 172.28.40.1

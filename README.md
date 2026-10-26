@@ -4,28 +4,34 @@
 
 A Docker Compose proof of concept for separating guest, corporate, and IoT traffic in a university network. A local login portal will identify users, and a Linux gateway will enforce network access rules.
 
-The current Sprint 2 foundation adds a gateway Firewall to the Sprint 1 Docker Compose topology. Guest and IoT requests to Corporate are blocked; forwarding uses Default Deny. The portal, authentication, role-based grants, and internet NAT remain future work. Build and isolation checks passed on 26 October 2026, including after gateway restart and container recreation. See the [recorded results and logs](evidence/sprint-2/results.md).
+The current Sprint 2 model adds a gateway Firewall and Guest internet access to the Sprint 1 Docker Compose topology. Guest and IoT requests to Corporate are blocked; forwarding uses Default Deny with explicit Guest web and DNS permissions. The portal, authentication, and role-based grants remain future work. See the [recorded results and logs](evidence/sprint-2/results.md) for validation status.
 
 ## Running the current network model
 
-With Docker running and Docker Compose available, run from the repository root:
+With Docker running and Docker Compose 2.33.1 or later available, run from the repository root:
 
 ```bash
 docker compose config --quiet
 docker compose up -d --build --wait
 sh scripts/check-isolation.sh
+sh scripts/check-internet.sh
 ```
 
-The check verifies that Nginx responds, the gateway reaches the site, both clients reach their gateway, and Guest/IoT requests to `172.28.20.10` fail while the corresponding Firewall drop counters increase. Expected request timeouts are part of successful isolation checks. No host port is published.
+The isolation check verifies that Nginx responds, the gateway reaches the site, both clients reach their gateway, and Guest/IoT requests to `172.28.20.10` fail while the corresponding Firewall drop counters increase. Expected request timeouts are part of successful isolation checks. The internet check fetches `http://example.com/` and `https://example.com/` from Guest, checks the response, validates HTTPS certificates, and requires the gateway's web counter to increase. No host port is published.
 
 Check that isolation survives container recreation:
 
 ```bash
 docker compose up -d --force-recreate --wait
 sh scripts/check-isolation.sh
+sh scripts/check-internet.sh
 ```
 
 The gateway becomes ready only after the nftables configuration loads. The other services wait for the gateway healthcheck during Compose startup. Configuration changes are loaded on restart; rebuild the gateway when its Dockerfile or entrypoint changes.
+
+Guest uses the gateway at `172.28.10.254`. Only the gateway joins the uplink (`172.28.40.0/24`) and uses `172.28.40.1` as its default route. The startup script discovers its uplink interface by IP and loads the forwarding and NAT tables in one transaction. Guest web access permits TCP 80/443; DNS permits UDP/TCP 53. Other new forwarded traffic stays blocked. Docker's embedded DNS can resolve names separately; the web counter proves that the actual HTTP/HTTPS traffic traverses the lab gateway.
+
+Collect anonymized logs for startup, gateway restart, and container recreation with `sh scripts/collect-isolation-evidence.sh`. This command restarts and recreates this lab's containers.
 
 Stop the lab with `docker compose down`. See [Sprint 2](sprints/sprint-2.md) for the Firewall policy, manual checks, and teammate tasks. [Sprint 1](sprints/sprint-1.md) preserves the original unrestricted baseline and its historical validation results.
 
@@ -68,7 +74,7 @@ Guest network                       Corporate network
 
 The portal must be reachable before authentication. Traffic from clients to internal resources must pass through the gateway. Client and resource containers must not share an alternative network that bypasses it. Internet traffic must also use the gateway when testing guest internet access.
 
-Docker Compose assigns fixed IP addresses to lab clients. The current subnets, addresses, and routes are recorded in [Sprint 1](sprints/sprint-1.md). The gateway has `NET_ADMIN` capability and IPv4 forwarding enabled by Docker Compose. Internet uplink behavior and NAT remain to be configured and tested.
+Docker Compose assigns fixed IP addresses to lab clients. The original subnets and routes are recorded in [Sprint 1](sprints/sprint-1.md); [Sprint 2](sprints/sprint-2.md) adds the uplink and Guest NAT. The gateway has `NET_ADMIN` capability and IPv4 forwarding enabled by Docker Compose.
 
 This is a virtual network model. No physical Wi-Fi access point is required. Users open the portal explicitly; automatic captive-portal detection and redirection are outside the initial design.
 
@@ -101,7 +107,7 @@ For this lab, each simulated device has a distinct fixed IP and one active ident
 
 The initial role demonstration can show **Your role: Student**, **Your role: Teacher**, or **Your role: Admin** after login. This verifies authentication and role assignment, but does not by itself demonstrate network enforcement.
 
-The minimum network demonstration distinguishes a guest from an authenticated client: the same internal resource is blocked before login and reachable after login. Showing different network permissions for Student, Teacher, and Admin requires an agreed resource and port matrix. That matrix is still to be decided; the role names alone do not define firewall rules.
+The planned minimum network demonstration distinguishes a guest from an authenticated client: the same internal resource is blocked before login and reachable after login. The [role matrix and portal design](docs/auth-portal-ua.md) define Student access to learning resources, Teacher access to those resources plus the teacher service, and Admin access to all defined test services. Concrete resource addresses/ports and dynamic gateway grants remain implementation work; the role names alone do not define Firewall rules.
 
 IoT-to-Corporate isolation is a separate network policy and does not depend on a user signing in.
 
@@ -126,6 +132,8 @@ Network enforcement will be verified using actual requests such as `curl` from c
 Evidence will include the command or action, expected result, actual result, PASS/FAIL status, and supporting logs or screenshots.
 
 ## Sprint planning
+
+Lab 13 materials: [planned Auth Portal with role matrix](docs/auth-portal-ua.md) and [verified network results](evidence/sprint-2/results.md). Final submission reports will be prepared after the baseline commit and screenshots are available. The [Sprint 2 description](sprints/sprint-2.md) includes the Lab 14 handoff.
 
 Sprint scope is kept separately from the overall design:
 

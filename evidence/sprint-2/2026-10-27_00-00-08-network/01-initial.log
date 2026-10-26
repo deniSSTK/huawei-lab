@@ -1,0 +1,298 @@
+
+$ docker compose config --quiet
+
+exit_status=0
+
+$ docker compose up -d --build --wait --wait-timeout 60
+ Image university-network-gateway Building 
+ Image university-network-guest-client Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.11kB done
+#1 DONE 0.0s
+
+#2 [gateway internal] load build definition from Dockerfile
+#2 DONE 0.0s
+
+#2 [gateway internal] load build definition from Dockerfile
+#2 transferring dockerfile: 210B done
+#2 DONE 0.0s
+
+#3 [gateway internal] load metadata for docker.io/library/alpine:3.22
+#3 DONE 0.0s
+
+#4 [guest-client internal] load build definition from Dockerfile
+#4 transferring dockerfile: 99B done
+#4 DONE 0.1s
+
+#5 [gateway internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#3 [guest-client internal] load metadata for docker.io/library/alpine:3.22
+#3 DONE 0.0s
+
+#6 [gateway internal] load build context
+#6 transferring context: 757B done
+#6 DONE 0.0s
+
+#7 [guest-client internal] load .dockerignore
+#7 transferring context: 2B done
+#7 DONE 0.1s
+
+#8 [gateway 2/3] RUN apk add --no-cache nftables
+#8 CACHED
+
+#9 [guest-client 1/3] FROM docker.io/library/alpine:3.22
+#9 CACHED
+
+#10 [gateway 3/3] COPY entrypoint.sh /usr/local/bin/gateway-entrypoint.sh
+#10 DONE 0.1s
+
+#11 [guest-client 2/2] RUN apk add --no-cache curl ca-certificates
+#11 ...
+
+#12 [gateway] exporting to image
+#12 exporting layers 0.0s done
+#12 writing image sha256:32489fd17d4e97402cadeede2f24768a0e3f9019857427fe55200af3767dee96 done
+#12 naming to docker.io/library/university-network-gateway done
+#12 DONE 0.1s
+
+#11 [guest-client 2/2] RUN apk add --no-cache curl ca-certificates
+#11 0.209 fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/main/aarch64/APKINDEX.tar.gz
+#11 ...
+
+#13 [gateway] resolving provenance for metadata file
+#13 DONE 0.0s
+
+#11 [guest-client 2/2] RUN apk add --no-cache curl ca-certificates
+#11 0.957 fetch https://dl-cdn.alpinelinux.org/alpine/v3.22/community/aarch64/APKINDEX.tar.gz
+#11 1.958 (1/10) Installing ca-certificates (20261020-r0)
+#11 2.083 (2/10) Installing brotli-libs (1.1.1-r0)
+#11 2.306 (3/10) Installing c-ares (1.34.9-r0)
+#11 2.397 (4/10) Installing libunistring (1.3-r0)
+#11 2.885 (5/10) Installing libidn2 (2.3.7-r0)
+#11 2.950 (6/10) Installing nghttp2-libs (1.69.0-r0)
+#11 3.010 (7/10) Installing libpsl (0.21.5-r3)
+#11 3.112 (8/10) Installing zstd-libs (1.5.7-r0)
+#11 3.236 (9/10) Installing libcurl (8.14.1-r4)
+#11 3.341 (10/10) Installing curl (8.14.1-r4)
+#11 3.416 Executing busybox-1.37.0-r20.trigger
+#11 3.426 Executing ca-certificates-20261020-r0.trigger
+#11 3.451 OK: 13 MiB in 26 packages
+#11 DONE 3.6s
+
+#14 [guest-client] exporting to image
+#14 exporting layers 0.0s done
+#14 writing image sha256:54426dd9e9a773e50d2bfaf2e0b36bd50465589fc30b1001d2cb2346c3bd42a7 done
+#14 naming to docker.io/library/university-network-guest-client done
+#14 DONE 0.0s
+
+#15 [guest-client] resolving provenance for metadata file
+#15 DONE 0.0s
+ Image university-network-gateway Built 
+ Image university-network-guest-client Built 
+ Network university-network_uplink Creating 
+ Network university-network_uplink Created 
+ Container university-network-gateway-1 Recreate 
+ Container university-network-gateway-1 Recreated 
+ Container university-network-iot-client-1 Running 
+ Container university-network-internal-site-1 Running 
+ Container university-network-guest-client-1 Recreate 
+ Container university-network-guest-client-1 Recreated 
+ Container university-network-gateway-1 Starting 
+ Container university-network-gateway-1 Started 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-guest-client-1 Starting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-guest-client-1 Started 
+ Container university-network-guest-client-1 Waiting 
+ Container university-network-internal-site-1 Waiting 
+ Container university-network-iot-client-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-guest-client-1 Healthy 
+ Container university-network-iot-client-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-internal-site-1 Healthy 
+
+exit_status=0
+
+$ docker compose ps
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED          STATUS                   PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         24 seconds ago   Up 3 seconds (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    13 seconds ago   Up Less than a second    
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   14 minutes ago   Up 14 minutes            80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      14 minutes ago   Up 14 minutes            
+
+exit_status=0
+
+$ docker compose ps -q
+c6ac8990343ffa0d7a2568a9aef19993aed388e51ac09dec40e72e41be260d41
+11f802178d4de4d4a233d54340f86c3ca99c9cb32e73cf932bacac5d66078042
+064ff13d1753077d6d838e9d4f7a35a5d4df69edf513dfdfb022245f5ff02f9a
+3fe246a052ad5edbdd71f54a21b6fdfaa1f877d9df28919ec8df7b49d848ad29
+
+exit_status=0
+
+$ docker compose exec -T gateway sysctl net.ipv4.ip_forward
+net.ipv4.ip_forward = 1
+
+exit_status=0
+
+$ docker compose exec -T guest-client ip route
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+
+exit_status=0
+
+$ docker compose exec -T iot-client ip route
+default via 172.28.30.254 dev eth0 
+172.28.30.0/24 dev eth0 scope link  src 172.28.30.10 
+
+exit_status=0
+
+$ docker compose exec -T internal-site ip route
+default via 172.28.20.254 dev eth0 
+172.28.20.0/24 dev eth0 scope link  src 172.28.20.10 
+
+exit_status=0
+
+$ sh scripts/check-isolation.sh
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+PASS: Internal Site responds inside Corporate
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+PASS: Gateway reaches Internal Site
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.130 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.130/0.130/0.130 ms
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.113 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.113/0.113/0.113 ms
+wget: download timed out
+PASS: guest-client blocked; guest_to_corporate packets 0 -> 3
+wget: download timed out
+PASS: iot-client blocked; iot_to_corporate packets 0 -> 3
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 3 bytes 180
+	}
+
+	counter iot_to_corporate {
+		packets 3 bytes 180
+	}
+
+	counter guest_to_internet {
+		packets 0 bytes 0
+	}
+
+	counter guest_dns {
+		packets 0 bytes 0
+	}
+
+	counter default_deny {
+		packets 0 bytes 0
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
+		ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
+		ct state invalid drop
+		ip saddr 172.28.10.0/24 oifname "eth3" tcp dport { 80, 443 } counter name "guest_to_internet" accept
+		ip saddr 172.28.10.0/24 oifname "eth3" udp dport 53 counter name "guest_dns" accept
+		ip saddr 172.28.10.0/24 oifname "eth3" tcp dport 53 counter name "guest_dns" accept
+		ct state established,related accept
+		counter name "default_deny" drop
+	}
+}
+
+exit_status=0
+
+$ sh scripts/check-internet.sh
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+PASS: Guest default route uses the lab Gateway
+default via 172.28.40.1 dev eth3 
+172.28.10.0/24 dev eth1 scope link  src 172.28.10.254 
+172.28.20.0/24 dev eth0 scope link  src 172.28.20.254 
+172.28.30.0/24 dev eth2 scope link  src 172.28.30.254 
+172.28.40.0/24 dev eth3 scope link  src 172.28.40.254 
+PASS: Gateway default route uses the uplink
+PASS: Guest fetched http://example.com/ (Example Domain); guest_to_internet packets 0 -> 6
+PASS: Guest fetched https://example.com/ (Example Domain); guest_to_internet packets 6 -> 19
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 19 bytes 2947
+	}
+}
+table ip lab_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.28.10.0/24 oifname "eth3" counter packets 2 bytes 120 masquerade
+	}
+}
+
+exit_status=0

@@ -26,7 +26,7 @@ sanitize_output() {
     '
 }
 
-evidence_dir="evidence/sprint-2/$(TZ=Europe/Kiev date +%Y-%m-%d_%H-%M-%S)-isolation"
+evidence_dir="evidence/sprint-2/$(TZ=Europe/Kiev date +%Y-%m-%d_%H-%M-%S)-network"
 mkdir -p "$evidence_dir"
 
 # Save both successful and failed command output, with its actual exit status.
@@ -57,7 +57,7 @@ if command -v sw_vers >/dev/null 2>&1; then
 fi
 record "$metadata" git rev-parse HEAD
 record "$metadata" git status --short
-record "$metadata" shasum -a 256 docker-compose.yml gateway/Dockerfile gateway/entrypoint.sh gateway/nftables.conf scripts/check-isolation.sh
+record "$metadata" shasum -a 256 docker-compose.yml client/Dockerfile gateway/Dockerfile gateway/entrypoint.sh gateway/nftables.conf gateway/nat.conf scripts/check-isolation.sh scripts/check-internet.sh scripts/collect-isolation-evidence.sh
 record "$metadata" docker version
 record "$metadata" docker compose version
 record "$metadata" docker compose config
@@ -73,6 +73,7 @@ run_checks() {
     record "$log_file" docker compose exec -T iot-client ip route
     record "$log_file" docker compose exec -T internal-site ip route
     record "$log_file" sh scripts/check-isolation.sh
+    record "$log_file" sh scripts/check-internet.sh
     printf 'PASS: %s; log: %s\n' "$stage" "$log_file"
 }
 
@@ -87,5 +88,4 @@ run_checks 02-restart
 record "$evidence_dir/03-recreate.log" docker compose up -d --force-recreate --wait --wait-timeout 60
 run_checks 03-recreate
 
-printf 'Isolation evidence saved to %s\n' "$evidence_dir"
-printf 'Guest internet was not tested; it is a separate work item.\n'
+printf 'Isolation and Guest internet evidence saved to %s\n' "$evidence_dir"
