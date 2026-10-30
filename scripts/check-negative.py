@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import re
 import shlex
+import socket
 import subprocess
 import sys
 from zoneinfo import ZoneInfo
@@ -26,7 +27,20 @@ def now():
     return datetime.datetime.now(ZoneInfo("Europe/Kiev")).isoformat(timespec="seconds")
 
 
+def sanitize_output(text):
+    replacements = (
+        (str(ROOT), "/workspace/huawei-lab"),
+        (str(Path.home()), "/home/lab-user"),
+        (socket.gethostname(), "lab-host"),
+    )
+    for value, replacement in replacements:
+        if value:
+            text = text.replace(value, replacement)
+    return text
+
+
 def append(filename, text):
+    text = sanitize_output(text)
     for name in (filename, "execution.log"):
         with (OUT / name).open("a") as stream:
             stream.write(text)
