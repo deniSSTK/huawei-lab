@@ -1,0 +1,36 @@
+{
+  "started": "2026-10-27T21:50:43+02:00",
+  "finished": "2026-10-27T21:51:55+02:00",
+  "scenarios": {
+    "NT-01": {
+      "status": "PASS",
+      "counter": "guest_to_corporate",
+      "before": 0,
+      "after": 5
+    },
+    "NT-02": {
+      "status": "PASS",
+      "counter": "iot_to_corporate",
+      "before": 0,
+      "after": 5
+    },
+    "NT-03": {
+      "status": "PASS",
+      "stages": [
+        "initial",
+        "restart",
+        "recreate"
+      ]
+    },
+    "NT-04": {
+      "status": "BLOCKED",
+      "reason": "Auth Portal, roles and sessions are absent from frozen baseline",
+      "services": [
+        "gateway",
+        "iot-client",
+        "guest-client",
+        "internal-site"
+      ]
+    }
+  }
+}

@@ -1,0 +1,53 @@
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T gateway wget -T 5 -t 1 -qO- http://172.28.20.10:8080/
+LAB16_TCP_8080_OK
+
+exit_status=0
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T iot-client ip route
+default via 172.28.30.254 dev eth0 
+172.28.30.0/24 dev eth0 scope link  src 172.28.30.10 
+
+exit_status=0
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T iot-client ping -c 1 -W 3 172.28.30.254
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.140 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.140/0.140/0.140 ms
+
+exit_status=0
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T gateway nft list counter inet lab_filter iot_to_corporate
+table inet lab_filter {
+	counter iot_to_corporate {
+		packets 0 bytes 0
+	}
+}
+
+exit_status=0
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T iot-client wget -Y off -O- -T 5 -t 1 http://172.28.20.10:8080/
+Connecting to 172.28.20.10:8080 (172.28.20.10:8080)
+wget: download timed out
+
+exit_status=1
+
+[2026-10-27T21:50:54+02:00]
+$ docker compose exec -T gateway nft list counter inet lab_filter iot_to_corporate
+table inet lab_filter {
+	counter iot_to_corporate {
+		packets 5 bytes 300
+	}
+}
+
+exit_status=0
+
+PASS: NT-02; iot-client blocked on TCP/8080; iot_to_corporate packets 0 -> 5

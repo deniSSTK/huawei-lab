@@ -63,6 +63,6 @@ sh scripts/collect-isolation-evidence.sh
 - політика дозволяє вебдоступ і dns; довільні зовнішні протоколи, icmp та інтернет iot цим завданням не відкривалися;
 - auth portal, вхід, рольові дозволи, logout і завершення сесій ще не реалізовані. самі мережеві перевірки не підтверджують r-04/r-08 у повному обсязі;
 - докази — знеособлені текстові логи; скріншоти термінала ще потрібно додати для звіту, якщо потрібен саме цей формат;
-- опис порталу й матриця ролей готові в [документації](../../docs/auth-portal-ua.md). Фінальні Sprint 2 Record та Freeze Record оформлюються після фіксації версії та скріншотів; кожен учасник окремо заповнює contribution log. Остаточну freeze-версію потрібно прив'язати до commit після збереження змін.
+- опис порталу й матриця ролей готові в [документації](../../docs/auth-portal.ua.md). Фінальні Sprint 2 Record та Freeze Record оформлюються після фіксації версії та скріншотів; кожен учасник окремо заповнює contribution log. Остаточну freeze-версію потрібно прив'язати до commit після збереження змін.
 
 правила вибору gateway описані в [документації docker compose](https://docs.docker.com/reference/compose-file/services/#gw_priority), параметр nft `--define` та masquerade — у [документації netfilter](https://netfilter.org/projects/nftables/manpage.html).

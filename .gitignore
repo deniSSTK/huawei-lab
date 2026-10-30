@@ -1,3 +1,36 @@
+# Local editor settings
 .idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS metadata
 .DS_Store
-~$*.docx
+._*
+
+# Generated reports, archives and document lock files
+/output/
+~$*
+.~lock.*#
+
+# Local environment overrides and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Python caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Temporary files and runtime logs
+*.tmp
+*.temp
+*.log
+
+# Lab evidence is versioned, including test logs
+!evidence/**/
+!evidence/**/*.log

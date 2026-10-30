@@ -1,0 +1,11 @@
+
+[2026-10-27T21:51:55+02:00]
+$ docker compose config --services
+gateway
+iot-client
+guest-client
+internal-site
+
+exit_status=0
+
+BLOCKED: NT-04; no Auth Portal service. Negative login/role/session actions were not executed. Issue D-01; handoff to Lab 17.

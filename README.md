@@ -1,6 +1,6 @@
 # University Network Access Control Lab
 
-[Українська версія](README-ua.md)
+[Українська версія](README.ua.md)
 
 A Docker Compose proof of concept for separating guest, corporate, and IoT traffic in a university network. A local login portal will identify users, and a Linux gateway will enforce network access rules.
 
@@ -107,7 +107,7 @@ For this lab, each simulated device has a distinct fixed IP and one active ident
 
 The initial role demonstration can show **Your role: Student**, **Your role: Teacher**, or **Your role: Admin** after login. This verifies authentication and role assignment, but does not by itself demonstrate network enforcement.
 
-The planned minimum network demonstration distinguishes a guest from an authenticated client: the same internal resource is blocked before login and reachable after login. The [role matrix and portal design](docs/auth-portal-ua.md) define Student access to learning resources, Teacher access to those resources plus the teacher service, and Admin access to all defined test services. Concrete resource addresses/ports and dynamic gateway grants remain implementation work; the role names alone do not define Firewall rules.
+The planned minimum network demonstration distinguishes a guest from an authenticated client: the same internal resource is blocked before login and reachable after login. The [role matrix and portal design](docs/auth-portal.ua.md) define Student access to learning resources, Teacher access to those resources plus the teacher service, and Admin access to all defined test services. Concrete resource addresses/ports and dynamic gateway grants remain implementation work; the role names alone do not define Firewall rules.
 
 IoT-to-Corporate isolation is a separate network policy and does not depend on a user signing in.
 
@@ -133,7 +133,7 @@ Evidence will include the command or action, expected result, actual result, PAS
 
 ## Sprint planning
 
-Lab 13 materials: [planned Auth Portal with role matrix](docs/auth-portal-ua.md) and [verified network results](evidence/sprint-2/results.md). Final submission reports will be prepared after the baseline commit and screenshots are available. The [Sprint 2 description](sprints/sprint-2.md) includes the Lab 14 handoff.
+Lab 13 materials: [planned Auth Portal with role matrix](docs/auth-portal.ua.md) and [verified network results](evidence/sprint-2/results.md). Final submission reports will be prepared after the baseline commit and screenshots are available. The [Sprint 2 description](sprints/sprint-2.md) includes the Lab 14 handoff.
 
 Sprint scope is kept separately from the overall design:
 

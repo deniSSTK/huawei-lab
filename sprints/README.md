@@ -1,6 +1,6 @@
 # Sprints
 
-[Українська версія](README-ua.md)
+[Українська версія](README.ua.md)
 
 This directory separates sprint commitments from the full project design in the [main README](../README.md).
 

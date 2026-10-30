@@ -1,6 +1,6 @@
 # Sprint 2: Firewall Foundation
 
-[Українська версія](sprint-2-ua.md)
+[Українська версія](sprint-2.ua.md)
 
 ## Goal and scope
 
@@ -57,7 +57,7 @@ The two client HTTP commands should fail; the server and gateway HTTP commands s
 
 The integrated checks passed on 27 October 2026 after startup, gateway restart and recreation of all containers: Nginx and the gateways respond, Guest/IoT requests to Corporate are blocked with increasing drop counters, and Guest receives HTTP/HTTPS responses through the gateway. See the single [results report with environment and logs](../evidence/sprint-2/results.md). Repeat collection with `sh scripts/collect-isolation-evidence.sh`.
 
-The [portal description and planned role matrix](../docs/auth-portal-ua.md) are documented. Portal implementation and automatic role grants remain future work. Evidence currently consists of actual command output; screenshots remain to be added for submission. Checks confirm isolation after readiness, not uninterrupted blocking during recreation. Cross-host portability has not been tested; the recorded run used OrbStack on macOS.
+The [portal description and planned role matrix](../docs/auth-portal.ua.md) are documented. Portal implementation and automatic role grants remain future work. Evidence currently consists of actual command output; screenshots remain to be added for submission. Checks confirm isolation after readiness, not uninterrupted blocking during recreation. Cross-host portability has not been tested; the recorded run used OrbStack on macOS.
 
 ## Lab 14 Implementation Freeze
 

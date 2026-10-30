@@ -1,0 +1,9 @@
+{
+  "baseline": "v1.0.0 / e601531989e28694bbddf5b43fceb88154d55daa",
+  "NT-01": "Gateway reaches live Corporate TCP/8080; Guest times out; guest_to_corporate increases.",
+  "NT-02": "Gateway reaches live Corporate TCP/8080; IoT times out; iot_to_corporate increases.",
+  "NT-03": "After gateway restart and container recreation, Guest/IoT isolation and Guest HTTP/HTTPS still pass after readiness.",
+  "NT-04": "Invalid credentials, wrong role and expired session must not grant access. BLOCKED if portal is absent.",
+  "scope": "TCP/8080 is the selected alternative port; UDP and downtime continuity are not tested. Temporary listener is a test fixture, not a baseline change.",
+  "recorded_before_execution": "2026-10-27T21:50:43+02:00"
+}

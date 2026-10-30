@@ -1,0 +1,884 @@
+
+[2026-10-27T21:50:43+02:00]
+$ git rev-parse HEAD
+e601531989e28694bbddf5b43fceb88154d55daa
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ git rev-parse 'v1.0.0^{commit}'
+e601531989e28694bbddf5b43fceb88154d55daa
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ git diff --exit-code HEAD -- docker-compose.yml gateway client
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ git status --short
+?? evidence/testing-1/
+?? evidence/testing-2/
+?? output/
+?? scripts/check-negative.py
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker version
+Client:
+ Version:           29.4.0
+ API version:       1.54
+ Go version:        go1.26.4
+ Git commit:        9d7ad9f
+ Built:             Fri Aug  7 04:38:56 2026
+ OS/Arch:           darwin/arm64
+ Context:           orbstack
+
+Server: Docker Engine - Community
+ Engine:
+  Version:          29.4.0
+  API version:      1.54 (minimum version 1.40)
+  Go version:       go1.26.1
+  Git commit:       daa0cb7f
+  Built:            Tue Apr  7 08:35:43 2026
+  OS/Arch:          linux/arm64
+  Experimental:     true
+ containerd:
+  Version:          v2.2.2
+  GitCommit:        301b2dac98f15c27117da5c8af12118a041a31d9
+ runc:
+  Version:          1.5.1
+  GitCommit:        bb14dabeb7185bb72c8c86735d090dcb20f36587
+ docker-init:
+  Version:          0.19.0
+  GitCommit:        de40ad0
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose version
+Docker Compose version v5.1.2
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose config
+name: university-network
+services:
+  gateway:
+    build:
+      context: /workspace/huawei-lab/gateway
+      dockerfile: Dockerfile
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test $$(cat /proc/sys/net/ipv4/ip_forward) = 1 && nft list chain inet lab_filter forward >/dev/null && nft list chain ip lab_nat postrouting >/dev/null
+      timeout: 2s
+      interval: 2s
+      retries: 10
+    networks:
+      corporate:
+        ipv4_address: 172.28.20.254
+      guest:
+        ipv4_address: 172.28.10.254
+      iot:
+        ipv4_address: 172.28.30.254
+      uplink:
+        gw_priority: 1
+        ipv4_address: 172.28.40.254
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    volumes:
+      - type: bind
+        source: /workspace/huawei-lab/gateway/nftables.conf
+        target: /etc/nftables.conf
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /workspace/huawei-lab/gateway/nat.conf
+        target: /etc/nat.conf
+        read_only: true
+        bind: {}
+  guest-client:
+    build:
+      context: /workspace/huawei-lab/client
+      dockerfile: Dockerfile
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.10.254
+        exec sleep infinity
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    networks:
+      guest:
+        ipv4_address: 172.28.10.10
+  internal-site:
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.20.254
+        exec nginx -g 'daemon off;'
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    image: nginx:stable-alpine
+    networks:
+      corporate:
+        ipv4_address: 172.28.20.10
+  iot-client:
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.30.254
+        exec sleep infinity
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    image: alpine:3.22
+    networks:
+      iot:
+        ipv4_address: 172.28.30.10
+networks:
+  corporate:
+    name: university-network_corporate
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.20.0/24
+          gateway: 172.28.20.1
+  guest:
+    name: university-network_guest
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.10.0/24
+          gateway: 172.28.10.1
+  iot:
+    name: university-network_iot
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.30.0/24
+          gateway: 172.28.30.1
+  uplink:
+    name: university-network_uplink
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.40.0/24
+          gateway: 172.28.40.1
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose ps
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED        STATUS                    PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         11 hours ago   Up 49 seconds (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    11 hours ago   Up 46 seconds             
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   11 hours ago   Up 46 seconds             80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      11 hours ago   Up 46 seconds             
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T internal-site sh -c 'printf '"'"'%s\n'"'"' '"'"'pid /tmp/lab16-nginx.pid; error_log /tmp/lab16-error.log; events {} http { access_log /tmp/lab16-access.log; server { listen 8080; location / { return 200 "LAB16_TCP_8080_OK\n"; } } }'"'"' > /tmp/lab16-nginx.conf && nginx -c /tmp/lab16-nginx.conf'
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T gateway wget -T 5 -t 1 -qO- http://172.28.20.10:8080/
+LAB16_TCP_8080_OK
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T guest-client ip route
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T guest-client ping -c 1 -W 3 172.28.10.254
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.453 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.453/0.453/0.453 ms
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T gateway nft list counter inet lab_filter guest_to_corporate
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 0 bytes 0
+	}
+}
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T guest-client curl -4 --noproxy '*' --connect-timeout 5 --max-time 5 --silent --show-error http://172.28.20.10:8080/
+curl: (28) Connection timed out after 5007 milliseconds
+
+exit_status=28
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T gateway nft list counter inet lab_filter guest_to_corporate
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 5 bytes 300
+	}
+}
+
+exit_status=0
+
+PASS: NT-01; guest-client blocked on TCP/8080; guest_to_corporate packets 0 -> 5
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T gateway wget -T 5 -t 1 -qO- http://172.28.20.10:8080/
+LAB16_TCP_8080_OK
+
+exit_status=0
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T iot-client ip route
+default via 172.28.30.254 dev eth0 
+172.28.30.0/24 dev eth0 scope link  src 172.28.30.10 
+
+exit_status=0
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T iot-client ping -c 1 -W 3 172.28.30.254
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.140 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.140/0.140/0.140 ms
+
+exit_status=0
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T gateway nft list counter inet lab_filter iot_to_corporate
+table inet lab_filter {
+	counter iot_to_corporate {
+		packets 0 bytes 0
+	}
+}
+
+exit_status=0
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T iot-client wget -Y off -O- -T 5 -t 1 http://172.28.20.10:8080/
+Connecting to 172.28.20.10:8080 (172.28.20.10:8080)
+wget: download timed out
+
+exit_status=1
+
+[2026-10-27T21:50:54+02:00]
+$ docker compose exec -T gateway nft list counter inet lab_filter iot_to_corporate
+table inet lab_filter {
+	counter iot_to_corporate {
+		packets 5 bytes 300
+	}
+}
+
+exit_status=0
+
+PASS: NT-02; iot-client blocked on TCP/8080; iot_to_corporate packets 0 -> 5
+
+[2026-10-27T21:50:54+02:00]
+$ docker compose exec -T internal-site nginx -s quit -c /tmp/lab16-nginx.conf
+2026/10/27 19:50:54 [notice] 25#25: signal process started
+
+exit_status=0
+
+Temporary TCP/8080 listener stopped; original nginx remains running.
+
+STAGE: initial
+
+[2026-10-27T21:50:54+02:00]
+$ docker compose ps
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED        STATUS                        PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         11 hours ago   Up About a minute (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    11 hours ago   Up 57 seconds                 
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   11 hours ago   Up 57 seconds                 80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      11 hours ago   Up 57 seconds                 
+
+exit_status=0
+
+[2026-10-27T21:50:54+02:00]
+$ docker compose ps -q
+bc1dbcb41c347655dee009cf8b5d5cd069cb111498c8d4562218a8a722b05e58
+768840f35cf3230656cf178950b5a1e8c0f6be21cb189a5e87e988562046fc11
+3bd63eca0fa41ba9c8ec346fa9fd10ba3af546e16b78b611e8038f9806c939a2
+da4623006a6ca9772308b6becb4b90d2f1ce29538580f854eae25306314a5182
+
+exit_status=0
+
+[2026-10-27T21:50:54+02:00]
+$ sh scripts/check-isolation.sh
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+PASS: Internal Site responds inside Corporate
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+PASS: Gateway reaches Internal Site
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.068 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.068/0.068/0.068 ms
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.087 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.087/0.087/0.087 ms
+wget: download timed out
+PASS: guest-client blocked; guest_to_corporate packets 5 -> 8
+wget: download timed out
+PASS: iot-client blocked; iot_to_corporate packets 5 -> 8
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 8 bytes 480
+	}
+
+	counter iot_to_corporate {
+		packets 8 bytes 480
+	}
+
+	counter guest_to_internet {
+		packets 0 bytes 0
+	}
+
+	counter guest_dns {
+		packets 0 bytes 0
+	}
+
+	counter default_deny {
+		packets 0 bytes 0
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
+		ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
+		ct state invalid drop
+		ip saddr 172.28.10.0/24 oifname "eth0" tcp dport { 80, 443 } counter name "guest_to_internet" accept
+		ip saddr 172.28.10.0/24 oifname "eth0" udp dport 53 counter name "guest_dns" accept
+		ip saddr 172.28.10.0/24 oifname "eth0" tcp dport 53 counter name "guest_dns" accept
+		ct state established,related accept
+		counter name "default_deny" drop
+	}
+}
+
+exit_status=0
+
+[2026-10-27T21:51:01+02:00]
+$ sh scripts/check-internet.sh
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+PASS: Guest default route uses the lab Gateway
+default via 172.28.40.1 dev eth0 
+172.28.10.0/24 dev eth2 scope link  src 172.28.10.254 
+172.28.20.0/24 dev eth1 scope link  src 172.28.20.254 
+172.28.30.0/24 dev eth3 scope link  src 172.28.30.254 
+172.28.40.0/24 dev eth0 scope link  src 172.28.40.254 
+PASS: Gateway default route uses the uplink
+PASS: Guest fetched http://example.com/ (Example Domain); guest_to_internet packets 0 -> 6
+PASS: Guest fetched https://example.com/ (Example Domain); guest_to_internet packets 6 -> 18
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 18 bytes 2895
+	}
+}
+table ip lab_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.28.10.0/24 oifname "eth0" counter packets 2 bytes 120 masquerade
+	}
+}
+
+exit_status=0
+
+PASS: NT-03 initial; isolation and Guest internet verified
+
+STAGE: restart
+
+[2026-10-27T21:51:02+02:00]
+$ docker compose restart gateway
+ Container university-network-gateway-1 Restarting 
+ Container university-network-gateway-1 Started 
+
+exit_status=0
+
+[2026-10-27T21:51:13+02:00]
+$ docker compose up -d --wait --wait-timeout 60
+ Container university-network-gateway-1 Running 
+ Container university-network-internal-site-1 Running 
+ Container university-network-iot-client-1 Running 
+ Container university-network-guest-client-1 Running 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-guest-client-1 Waiting 
+ Container university-network-internal-site-1 Waiting 
+ Container university-network-iot-client-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-guest-client-1 Healthy 
+ Container university-network-iot-client-1 Healthy 
+ Container university-network-internal-site-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+
+exit_status=0
+
+[2026-10-27T21:51:15+02:00]
+$ docker compose ps
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED        STATUS                   PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         11 hours ago   Up 2 seconds (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    11 hours ago   Up About a minute        
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   11 hours ago   Up About a minute        80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      11 hours ago   Up About a minute        
+
+exit_status=0
+
+[2026-10-27T21:51:15+02:00]
+$ docker compose ps -q
+bc1dbcb41c347655dee009cf8b5d5cd069cb111498c8d4562218a8a722b05e58
+768840f35cf3230656cf178950b5a1e8c0f6be21cb189a5e87e988562046fc11
+3bd63eca0fa41ba9c8ec346fa9fd10ba3af546e16b78b611e8038f9806c939a2
+da4623006a6ca9772308b6becb4b90d2f1ce29538580f854eae25306314a5182
+
+exit_status=0
+
+[2026-10-27T21:51:15+02:00]
+$ sh scripts/check-isolation.sh
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+PASS: Internal Site responds inside Corporate
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+PASS: Gateway reaches Internal Site
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.084 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.084/0.084/0.084 ms
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.065 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.065/0.065/0.065 ms
+wget: download timed out
+PASS: guest-client blocked; guest_to_corporate packets 0 -> 3
+wget: download timed out
+PASS: iot-client blocked; iot_to_corporate packets 0 -> 3
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 3 bytes 180
+	}
+
+	counter iot_to_corporate {
+		packets 3 bytes 180
+	}
+
+	counter guest_to_internet {
+		packets 0 bytes 0
+	}
+
+	counter guest_dns {
+		packets 0 bytes 0
+	}
+
+	counter default_deny {
+		packets 0 bytes 0
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
+		ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
+		ct state invalid drop
+		ip saddr 172.28.10.0/24 oifname "eth0" tcp dport { 80, 443 } counter name "guest_to_internet" accept
+		ip saddr 172.28.10.0/24 oifname "eth0" udp dport 53 counter name "guest_dns" accept
+		ip saddr 172.28.10.0/24 oifname "eth0" tcp dport 53 counter name "guest_dns" accept
+		ct state established,related accept
+		counter name "default_deny" drop
+	}
+}
+
+exit_status=0
+
+[2026-10-27T21:51:22+02:00]
+$ sh scripts/check-internet.sh
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+PASS: Guest default route uses the lab Gateway
+default via 172.28.40.1 dev eth0 
+172.28.10.0/24 dev eth2 scope link  src 172.28.10.254 
+172.28.20.0/24 dev eth1 scope link  src 172.28.20.254 
+172.28.30.0/24 dev eth3 scope link  src 172.28.30.254 
+172.28.40.0/24 dev eth0 scope link  src 172.28.40.254 
+PASS: Gateway default route uses the uplink
+PASS: Guest fetched http://example.com/ (Example Domain); guest_to_internet packets 0 -> 6
+PASS: Guest fetched https://example.com/ (Example Domain); guest_to_internet packets 6 -> 19
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 19 bytes 2947
+	}
+}
+table ip lab_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.28.10.0/24 oifname "eth0" counter packets 2 bytes 120 masquerade
+	}
+}
+
+exit_status=0
+
+PASS: NT-03 restart; isolation and Guest internet verified
+
+STAGE: recreate
+
+[2026-10-27T21:51:23+02:00]
+$ docker compose up -d --force-recreate --wait --wait-timeout 60
+ Container university-network-gateway-1 Recreate 
+ Container university-network-gateway-1 Recreated 
+ Container university-network-iot-client-1 Recreate 
+ Container university-network-guest-client-1 Recreate 
+ Container university-network-internal-site-1 Recreate 
+ Container university-network-internal-site-1 Recreated 
+ Container university-network-guest-client-1 Recreated 
+ Container university-network-iot-client-1 Recreated 
+ Container university-network-gateway-1 Starting 
+ Container university-network-gateway-1 Started 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-iot-client-1 Starting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-guest-client-1 Starting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-internal-site-1 Starting 
+ Container university-network-iot-client-1 Started 
+ Container university-network-guest-client-1 Started 
+ Container university-network-internal-site-1 Started 
+ Container university-network-internal-site-1 Waiting 
+ Container university-network-iot-client-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-guest-client-1 Waiting 
+ Container university-network-internal-site-1 Healthy 
+ Container university-network-iot-client-1 Healthy 
+ Container university-network-guest-client-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+
+exit_status=0
+
+[2026-10-27T21:51:47+02:00]
+$ docker compose ps
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED          STATUS                   PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         24 seconds ago   Up 3 seconds (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    14 seconds ago   Up Less than a second    
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   14 seconds ago   Up Less than a second    80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      14 seconds ago   Up Less than a second    
+
+exit_status=0
+
+[2026-10-27T21:51:47+02:00]
+$ docker compose ps -q
+a4756eb087ff7e5dff3466a771102859648908ce4c884d4aac1850f6eb626b80
+8fdc33072d035276cd1c6086c9f2209ae32c8e22328a02aa9aca03e71ce27fa3
+382a45ffd5e8a7d05145cace1c0061a9cde65ce84326e5a01178ed4f6364c292
+7d7daf9ec40c081b72a298deab081e8fa5466cdb0d6eafe301ad548233532061
+
+exit_status=0
+
+[2026-10-27T21:51:47+02:00]
+$ sh scripts/check-isolation.sh
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+PASS: Internal Site responds inside Corporate
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+PASS: Gateway reaches Internal Site
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.074 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.074/0.074/0.074 ms
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.076 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.076/0.076/0.076 ms
+wget: download timed out
+PASS: guest-client blocked; guest_to_corporate packets 0 -> 3
+wget: download timed out
+PASS: iot-client blocked; iot_to_corporate packets 0 -> 3
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 3 bytes 180
+	}
+
+	counter iot_to_corporate {
+		packets 3 bytes 180
+	}
+
+	counter guest_to_internet {
+		packets 0 bytes 0
+	}
+
+	counter guest_dns {
+		packets 0 bytes 0
+	}
+
+	counter default_deny {
+		packets 0 bytes 0
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
+		ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
+		ct state invalid drop
+		ip saddr 172.28.10.0/24 oifname "eth0" tcp dport { 80, 443 } counter name "guest_to_internet" accept
+		ip saddr 172.28.10.0/24 oifname "eth0" udp dport 53 counter name "guest_dns" accept
+		ip saddr 172.28.10.0/24 oifname "eth0" tcp dport 53 counter name "guest_dns" accept
+		ct state established,related accept
+		counter name "default_deny" drop
+	}
+}
+
+exit_status=0
+
+[2026-10-27T21:51:54+02:00]
+$ sh scripts/check-internet.sh
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+PASS: Guest default route uses the lab Gateway
+default via 172.28.40.1 dev eth0 
+172.28.10.0/24 dev eth2 scope link  src 172.28.10.254 
+172.28.20.0/24 dev eth1 scope link  src 172.28.20.254 
+172.28.30.0/24 dev eth3 scope link  src 172.28.30.254 
+172.28.40.0/24 dev eth0 scope link  src 172.28.40.254 
+PASS: Gateway default route uses the uplink
+PASS: Guest fetched http://example.com/ (Example Domain); guest_to_internet packets 0 -> 6
+PASS: Guest fetched https://example.com/ (Example Domain); guest_to_internet packets 6 -> 18
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 18 bytes 2895
+	}
+}
+table ip lab_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.28.10.0/24 oifname "eth0" counter packets 2 bytes 120 masquerade
+	}
+}
+
+exit_status=0
+
+PASS: NT-03 recreate; isolation and Guest internet verified
+
+[2026-10-27T21:51:55+02:00]
+$ docker compose config --services
+gateway
+iot-client
+guest-client
+internal-site
+
+exit_status=0
+
+BLOCKED: NT-04; no Auth Portal service. Negative login/role/session actions were not executed. Issue D-01; handoff to Lab 17.
+
+[2026-10-27T21:51:55+02:00]
+$ git diff --exit-code HEAD -- docker-compose.yml gateway client
+
+exit_status=0

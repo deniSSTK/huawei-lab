@@ -1,6 +1,6 @@
 # Sprint 1: Network Foundation
 
-[Українська версія](sprint-1-ua.md)
+[Українська версія](sprint-1.ua.md)
 
 ## Goal
 

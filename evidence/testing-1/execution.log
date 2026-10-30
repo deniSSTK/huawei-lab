@@ -1,0 +1,176 @@
+$ docker compose ps
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED       STATUS                    PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         3 hours ago   Up 52 seconds (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    3 hours ago   Up 49 seconds             
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   3 hours ago   Up 49 seconds             80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      3 hours ago   Up 49 seconds             
+
+exit_status=0
+
+$ docker compose exec -T gateway wget -T 3 -t 1 -qO- http://172.28.20.10
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, nginx is successfully installed and working.
+Further configuration is required for the web server, reverse proxy, 
+API gateway, load balancer, content cache, or other features.</p>
+
+<p>For online documentation and support please refer to
+<a href="https://nginx.org/">nginx.org</a>.<br/>
+To engage with the community please visit
+<a href="https://community.nginx.org/">community.nginx.org</a>.<br/>
+For enterprise grade support, professional services, additional 
+security features and capabilities please refer to
+<a href="https://f5.com/nginx">f5.com/nginx</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+
+exit_status=0
+
+$ docker compose exec -T guest-client ip route
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+
+exit_status=0
+
+$ docker compose exec -T guest-client sh -c 'curl -4 --noproxy "*" --connect-timeout 5 --max-time 20 --fail --silent --show-error -D - http://example.com/ && curl -4 --noproxy "*" --connect-timeout 5 --max-time 20 --fail --silent --show-error -D - https://example.com/'
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 11:12:50 GMT
+Content-Type: text/html; charset=utf-8
+Transfer-Encoding: chunked
+Connection: keep-alive
+Server: cloudflare
+Last-Modified: Sat, 24 Oct 2026 20:05:47 GMT
+Allow: GET, HEAD
+Accept-Ranges: bytes
+Age: 6997
+cf-cache-status: HIT
+CF-RAY: a511449a1c3f77b6-KBP
+alt-svc: h3=":443"; ma=86400
+
+<!doctype html><html lang=en><head><meta charset=utf-8><link rel=icon href=data:,><meta name=viewport content="width=device-width,initial-scale=1"><title>Example Domain</title><style>html{color-scheme:light dark;background:light-dark(#eee,#222)}body{font:16px/1.6 system-ui,sans-serif;max-width:26em;margin:auto;padding:25vh 2em 2em;text-align:center}</style></head><body><p>This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.</p><script src=/s.js></script></body></html>
+HTTP/2 200 
+date: Tue, 27 Oct 2026 11:12:50 GMT
+content-type: text/html; charset=utf-8
+server: cloudflare
+last-modified: Sat, 24 Oct 2026 20:05:47 GMT
+allow: GET, HEAD
+accept-ranges: bytes
+age: 8
+cf-cache-status: HIT
+cf-ray: a511449c1ff670b0-VIE
+alt-svc: h3=":443"; ma=86400
+
+<!doctype html><html lang=en><head><meta charset=utf-8><link rel=icon href=data:,><meta name=viewport content="width=device-width,initial-scale=1"><title>Example Domain</title><style>html{color-scheme:light dark;background:light-dark(#eee,#222)}body{font:16px/1.6 system-ui,sans-serif;max-width:26em;margin:auto;padding:25vh 2em 2em;text-align:center}</style></head><body><p>This domain is for use in documentation examples without needing permission. This is not a service; avoid relying on it for testing and monitoring purposes.</p><script src=/s.js></script></body></html>
+
+exit_status=0
+
+$ docker compose exec -T gateway nft list counter inet lab_filter guest_to_internet
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 19 bytes 2947
+	}
+}
+
+exit_status=0
+
+$ docker compose exec -T guest-client curl -4 --noproxy '*' --connect-timeout 5 --max-time 20 --fail --silent --show-error -I http://example.com/
+HTTP/1.1 200 OK
+Date: Tue, 27 Oct 2026 11:13:04 GMT
+Content-Type: text/html; charset=utf-8
+Connection: keep-alive
+Server: cloudflare
+Last-Modified: Sat, 24 Oct 2026 20:05:47 GMT
+Allow: GET, HEAD
+Accept-Ranges: bytes
+Age: 7011
+cf-cache-status: HIT
+CF-RAY: a51144f6084a22f5-KBP
+alt-svc: h3=":443"; ma=86400
+
+
+exit_status=0
+
+$ docker compose exec -T guest-client curl -4 --noproxy '*' --connect-timeout 5 --max-time 20 --fail --silent --show-error -I https://example.com/
+HTTP/2 200 
+date: Tue, 27 Oct 2026 11:13:06 GMT
+content-type: text/html; charset=utf-8
+server: cloudflare
+last-modified: Sat, 24 Oct 2026 20:05:47 GMT
+allow: GET, HEAD
+accept-ranges: bytes
+age: 0
+cf-cache-status: HIT
+cf-ray: a51145014cc1c289-VIE
+alt-svc: h3=":443"; ma=86400
+
+
+exit_status=0
+
+$ docker compose exec -T gateway nft list counter inet lab_filter guest_to_internet
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 39 bytes 5952
+	}
+}
+
+exit_status=0
+
+$ docker compose exec -T gateway nft list counter inet lab_filter guest_to_corporate
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 0 bytes 0
+	}
+}
+
+exit_status=0
+
+$ docker compose exec -T guest-client curl -4 --noproxy '*' --connect-timeout 5 --max-time 5 --silent --show-error http://172.28.20.10
+curl: (28) Connection timed out after 5006 milliseconds
+
+exit_status=28
+
+$ docker compose exec -T gateway nft list counter inet lab_filter guest_to_corporate
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 5 bytes 300
+	}
+}
+
+exit_status=0
+
+$ docker compose exec -T gateway nft list counter inet lab_filter iot_to_corporate
+table inet lab_filter {
+	counter iot_to_corporate {
+		packets 0 bytes 0
+	}
+}
+
+exit_status=0
+
+$ docker compose exec -T iot-client wget -Y off -O- -T 5 -t 1 http://172.28.20.10
+Connecting to 172.28.20.10 (172.28.20.10:80)
+wget: download timed out
+
+exit_status=1
+
+$ docker compose exec -T gateway nft list counter inet lab_filter iot_to_corporate
+table inet lab_filter {
+	counter iot_to_corporate {
+		packets 5 bytes 300
+	}
+}
+
+exit_status=0
+

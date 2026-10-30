@@ -1,0 +1,52 @@
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T gateway wget -T 5 -t 1 -qO- http://172.28.20.10:8080/
+LAB16_TCP_8080_OK
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T guest-client ip route
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T guest-client ping -c 1 -W 3 172.28.10.254
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.453 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.453/0.453/0.453 ms
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T gateway nft list counter inet lab_filter guest_to_corporate
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 0 bytes 0
+	}
+}
+
+exit_status=0
+
+[2026-10-27T21:50:43+02:00]
+$ docker compose exec -T guest-client curl -4 --noproxy '*' --connect-timeout 5 --max-time 5 --silent --show-error http://172.28.20.10:8080/
+curl: (28) Connection timed out after 5007 milliseconds
+
+exit_status=28
+
+[2026-10-27T21:50:49+02:00]
+$ docker compose exec -T gateway nft list counter inet lab_filter guest_to_corporate
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 5 bytes 300
+	}
+}
+
+exit_status=0
+
+PASS: NT-01; guest-client blocked on TCP/8080; guest_to_corporate packets 0 -> 5
