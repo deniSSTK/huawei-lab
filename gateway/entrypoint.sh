@@ -15,4 +15,4 @@ fi
 printf 'include "/etc/nftables.conf"\ninclude "/etc/nat.conf"\n' |
     nft --define "uplink_if=\"$uplink_interface\"" -f -
 
-exec sleep infinity
+exec /usr/local/bin/gateway-control

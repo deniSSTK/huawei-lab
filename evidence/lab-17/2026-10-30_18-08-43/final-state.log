@@ -1,0 +1,19 @@
+$ docker compose ps --format '{{.Service}} {{.State}} {{.Health}}'
+gateway running healthy
+guest-client running 
+guest-peer running 
+internal-site running 
+iot-client running 
+portal running healthy
+exit_status=0
+$ docker compose exec -T portal printenv SESSION_TTL_SECONDS
+300
+exit_status=0
+$ docker compose exec -T gateway nft list set inet lab_filter role_access
+table inet lab_filter {
+	set role_access {
+		type ipv4_addr . inet_service
+		flags timeout
+	}
+}
+exit_status=0

@@ -1,0 +1,358 @@
+[2026-10-30T18:10:09+02:00] NT-03: gateway restart and full recreation; login and regression after readiness
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376621,"role":"student"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 6, "bytes": 396}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 12, "bytes": 792}}]}
+exit_status=0
+PASS: guest-client TCP/80 ALLOWED; role_allowed 6 -> 12
+$ docker compose restart gateway
+ Container university-network-gateway-1 Restarting 
+ Container university-network-gateway-1 Started
+exit_status=0
+$ docker compose up -d --wait
+ Container university-network-gateway-1 Running 
+ Container university-network-guest-client-1 Running 
+ Container university-network-iot-client-1 Running 
+ Container university-network-portal-1 Running 
+ Container university-network-guest-peer-1 Running 
+ Container university-network-internal-site-1 Running 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-internal-site-1 Waiting 
+ Container university-network-iot-client-1 Waiting 
+ Container university-network-guest-peer-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-portal-1 Waiting 
+ Container university-network-guest-client-1 Waiting 
+ Container university-network-guest-peer-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-internal-site-1 Healthy 
+ Container university-network-portal-1 Healthy 
+ Container university-network-guest-client-1 Healthy 
+ Container university-network-iot-client-1 Healthy
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 1, "bytes": 60}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 0 -> 1
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376626,"role":"student"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 6, "bytes": 396}}]}
+exit_status=0
+PASS: guest-client TCP/80 ALLOWED; role_allowed 0 -> 6
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+$ sh scripts/check-isolation.sh
+STUDENT learning materials
+
+PASS: Internal Site responds inside Corporate
+STUDENT learning materials
+
+PASS: Gateway reaches Internal Site
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.118 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.118/0.118/0.118 ms
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.081 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.081/0.081/0.081 ms
+wget: download timed out
+PASS: guest-client blocked; guest_to_corporate packets 1 -> 4
+wget: download timed out
+PASS: iot-client blocked; iot_to_corporate packets 0 -> 3
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 4 bytes 240
+	}
+
+	counter iot_to_corporate {
+		packets 3 bytes 180
+	}
+
+	counter guest_to_internet {
+		packets 0 bytes 0
+	}
+
+	counter guest_dns {
+		packets 0 bytes 0
+	}
+
+	counter default_deny {
+		packets 0 bytes 0
+	}
+
+	counter role_allowed {
+		packets 6 bytes 396
+	}
+
+	set role_access {
+		type ipv4_addr . inet_service
+		flags timeout
+	}
+
+	chain input {
+		type filter hook input priority filter; policy accept;
+		ip saddr 172.28.50.10 ip daddr 172.28.50.254 tcp dport 9090 accept
+		tcp dport 9090 drop
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ct state invalid drop
+		ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.10 ip saddr . tcp dport @role_access counter name "role_allowed" accept
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
+		ip saddr 172.28.10.0/24 oifname "eth4" tcp dport { 80, 443 } counter name "guest_to_internet" accept
+		ip saddr 172.28.10.0/24 oifname "eth4" udp dport 53 counter name "guest_dns" accept
+		ip saddr 172.28.10.0/24 oifname "eth4" tcp dport 53 counter name "guest_dns" accept
+		ct state established,related accept
+		counter name "default_deny" drop
+	}
+}
+exit_status=0
+$ sh scripts/check-internet.sh
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+PASS: Guest default route uses the lab Gateway
+default via 172.28.40.1 dev eth4 
+172.28.10.0/24 dev eth1 scope link  src 172.28.10.254 
+172.28.20.0/24 dev eth0 scope link  src 172.28.20.254 
+172.28.30.0/24 dev eth2 scope link  src 172.28.30.254 
+172.28.40.0/24 dev eth4 scope link  src 172.28.40.254 
+172.28.50.0/24 dev eth3 scope link  src 172.28.50.254 
+PASS: Gateway default route uses the uplink
+PASS: Guest fetched http://example.com/ (Example Domain); guest_to_internet packets 0 -> 6
+PASS: Guest fetched https://example.com/ (Example Domain); guest_to_internet packets 6 -> 19
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 19 bytes 2995
+	}
+}
+table ip lab_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.28.10.0/24 oifname "eth4" counter packets 2 bytes 120 masquerade
+	}
+}
+exit_status=0
+$ docker compose up -d --force-recreate --wait
+ Container university-network-gateway-1 Recreate 
+ Container university-network-gateway-1 Recreated 
+ Container university-network-portal-1 Recreate 
+ Container university-network-guest-client-1 Recreate 
+ Container university-network-internal-site-1 Recreate 
+ Container university-network-guest-peer-1 Recreate 
+ Container university-network-iot-client-1 Recreate 
+ Container university-network-internal-site-1 Recreated 
+ Container university-network-portal-1 Recreated 
+ Container university-network-guest-peer-1 Recreated 
+ Container university-network-iot-client-1 Recreated 
+ Container university-network-guest-client-1 Recreated 
+ Container university-network-gateway-1 Starting 
+ Container university-network-gateway-1 Started 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Starting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-iot-client-1 Starting 
+ Container university-network-internal-site-1 Starting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-guest-client-1 Starting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-guest-peer-1 Starting 
+ Container university-network-internal-site-1 Started 
+ Container university-network-guest-client-1 Started 
+ Container university-network-guest-peer-1 Started 
+ Container university-network-iot-client-1 Started 
+ Container university-network-portal-1 Started 
+ Container university-network-guest-peer-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-portal-1 Waiting 
+ Container university-network-guest-client-1 Waiting 
+ Container university-network-internal-site-1 Waiting 
+ Container university-network-iot-client-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-internal-site-1 Healthy 
+ Container university-network-guest-client-1 Healthy 
+ Container university-network-iot-client-1 Healthy 
+ Container university-network-guest-peer-1 Healthy 
+ Container university-network-portal-1 Healthy
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1002 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 1, "bytes": 60}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 0 -> 1
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376653,"role":"teacher"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+TEACHER service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 6, "bytes": 401}}]}
+exit_status=0
+PASS: guest-client TCP/8081 ALLOWED; role_allowed 0 -> 6
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+$ sh scripts/check-isolation.sh
+STUDENT learning materials
+
+PASS: Internal Site responds inside Corporate
+STUDENT learning materials
+
+PASS: Gateway reaches Internal Site
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.127 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.127/0.127/0.127 ms
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.153 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.153/0.153/0.153 ms
+wget: download timed out
+PASS: guest-client blocked; guest_to_corporate packets 1 -> 4
+wget: download timed out
+PASS: iot-client blocked; iot_to_corporate packets 0 -> 3
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 4 bytes 240
+	}
+
+	counter iot_to_corporate {
+		packets 3 bytes 180
+	}
+
+	counter guest_to_internet {
+		packets 0 bytes 0
+	}
+
+	counter guest_dns {
+		packets 0 bytes 0
+	}
+
+	counter default_deny {
+		packets 0 bytes 0
+	}
+
+	counter role_allowed {
+		packets 6 bytes 401
+	}
+
+	set role_access {
+		type ipv4_addr . inet_service
+		flags timeout
+	}
+
+	chain input {
+		type filter hook input priority filter; policy accept;
+		ip saddr 172.28.50.10 ip daddr 172.28.50.254 tcp dport 9090 accept
+		tcp dport 9090 drop
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ct state invalid drop
+		ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.10 ip saddr . tcp dport @role_access counter name "role_allowed" accept
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
+		ip saddr 172.28.10.0/24 oifname "eth4" tcp dport { 80, 443 } counter name "guest_to_internet" accept
+		ip saddr 172.28.10.0/24 oifname "eth4" udp dport 53 counter name "guest_dns" accept
+		ip saddr 172.28.10.0/24 oifname "eth4" tcp dport 53 counter name "guest_dns" accept
+		ct state established,related accept
+		counter name "default_deny" drop
+	}
+}
+exit_status=0
+$ sh scripts/check-internet.sh
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+PASS: Guest default route uses the lab Gateway
+default via 172.28.40.1 dev eth4 
+172.28.10.0/24 dev eth1 scope link  src 172.28.10.254 
+172.28.20.0/24 dev eth0 scope link  src 172.28.20.254 
+172.28.30.0/24 dev eth2 scope link  src 172.28.30.254 
+172.28.40.0/24 dev eth4 scope link  src 172.28.40.254 
+172.28.50.0/24 dev eth3 scope link  src 172.28.50.254 
+PASS: Gateway default route uses the uplink
+PASS: Guest fetched http://example.com/ (Example Domain); guest_to_internet packets 0 -> 6
+PASS: Guest fetched https://example.com/ (Example Domain); guest_to_internet packets 6 -> 18
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 18 bytes 2895
+	}
+}
+table ip lab_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.28.10.0/24 oifname "eth4" counter packets 2 bytes 120 masquerade
+	}
+}
+exit_status=0
+RESULT: PASS RG-03

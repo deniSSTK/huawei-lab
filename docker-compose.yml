@@ -2,7 +2,11 @@ name: university-network
 
 services:
   gateway:
-    build: ./gateway
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    secrets:
+      - gateway_token
     volumes:
       - ./gateway/nftables.conf:/etc/nftables.conf:ro
       - ./gateway/nat.conf:/etc/nat.conf:ro
@@ -25,6 +29,36 @@ services:
       uplink:
         ipv4_address: 172.28.40.254
         gw_priority: 1
+      management:
+        ipv4_address: 172.28.50.254
+
+  portal:
+    build:
+      context: .
+      dockerfile: auth/Dockerfile
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-300}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    secrets:
+      - gateway_token
+      - test_users
+    volumes:
+      - portal-data:/data
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    networks:
+      guest:
+        ipv4_address: 172.28.10.20
+      management:
+        ipv4_address: 172.28.50.10
 
   guest-client:
     build: ./client
@@ -45,6 +79,8 @@ services:
 
   internal-site:
     image: nginx:stable-alpine
+    volumes:
+      - ./internal-site/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       gateway:
         condition: service_healthy
@@ -77,7 +113,35 @@ services:
       iot:
         ipv4_address: 172.28.30.10
 
+  guest-peer:
+    build: ./client
+    depends_on:
+      gateway:
+        condition: service_healthy
+    command: ["sh", "-c", "ip route replace default via 172.28.10.254; exec sleep infinity"]
+    cap_add:
+      - NET_ADMIN
+    networks:
+      guest:
+        ipv4_address: 172.28.10.11
+
+secrets:
+  gateway_token:
+    file: ./.secrets/gateway-token
+  test_users:
+    file: ./.secrets/test-users.json
+
+volumes:
+  portal-data:
+
 networks:
+  management:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.50.0/24
+          gateway: 172.28.50.1
   guest:
     driver: bridge
     ipam:

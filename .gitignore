@@ -16,6 +16,10 @@
 # Local environment overrides and secrets
 .env
 .env.*
+.secrets/
+*.db
+*.db-shm
+*.db-wal
 !.env.example
 !.env.*.example
 

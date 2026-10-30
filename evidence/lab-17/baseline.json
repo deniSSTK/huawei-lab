@@ -1,0 +1,21 @@
+{
+  "version": "lab17-stabilization-1",
+  "date": "2026-10-30",
+  "git_parent": "56855fd9553a88e8f9ceef42b8db6577127a92da",
+  "identity": "SHA-256 of the tested source manifest, including uncommitted implementation files",
+  "source_manifest": "evidence/lab-17/2026-10-30_18-08-43/source-sha256.json",
+  "source_manifest_sha256": "23037e150b8dcee7aa8034e3ca2e568927e5d362809b4fc409e90ec48174eba8",
+  "retest": "evidence/lab-17/2026-10-30_18-08-43/results.json",
+  "retest_summary": {
+    "PASS": 12,
+    "FAIL": 0,
+    "BLOCKED": 0
+  },
+  "readiness": "READY WITH KNOWN ISSUES",
+  "known_limits": [
+    "Trusted-client IP-based lab; NET_ADMIN clients can alter routes or spoof addresses.",
+    "Local HTTP demonstration; enable Secure cookies only when deploying HTTPS.",
+    "Recovery checked after readiness; uninterrupted isolation during recreation not established.",
+    "Gateway restart clears permissions and requires a new login."
+  ]
+}

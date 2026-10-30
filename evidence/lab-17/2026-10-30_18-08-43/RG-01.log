@@ -1,0 +1,82 @@
+[2026-10-30T18:09:53+02:00] NT-01/02: alternate port denied, IoT stays isolated even during Admin session
+$ docker compose exec -T internal-site sh -c 'cat > /tmp/lab17-nginx.conf; nginx -c /tmp/lab17-nginx.conf'
+
+exit_status=0
+$ docker compose exec -T gateway wget -T 2 -qO- http://172.28.20.10:8080/
+ALTERNATE probe
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 1, "bytes": 60}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8080/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 2, "bytes": 120}}]}
+exit_status=0
+PASS: guest-client TCP/8080 BLOCKED; guest_to_corporate 1 -> 2
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T iot-client wget -T 1 -t 1 -qO- http://172.28.20.10:8080/
+wget: download timed out
+exit_status=1
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 1, "bytes": 60}}]}
+exit_status=0
+PASS: iot-client TCP/8080 BLOCKED; iot_to_corporate 0 -> 1
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376608,"role":"admin"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 2, "bytes": 120}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8080/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 3, "bytes": 180}}]}
+exit_status=0
+PASS: guest-client TCP/8080 BLOCKED; guest_to_corporate 2 -> 3
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 1, "bytes": 60}}]}
+exit_status=0
+$ docker compose exec -T iot-client wget -T 1 -t 1 -qO- http://172.28.20.10:80/
+wget: download timed out
+exit_status=1
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 2, "bytes": 120}}]}
+exit_status=0
+PASS: iot-client TCP/80 BLOCKED; iot_to_corporate 1 -> 2
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 2, "bytes": 120}}]}
+exit_status=0
+$ docker compose exec -T iot-client wget -T 1 -t 1 -qO- http://172.28.20.10:8081/
+wget: download timed out
+exit_status=1
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 3, "bytes": 180}}]}
+exit_status=0
+PASS: iot-client TCP/8081 BLOCKED; iot_to_corporate 2 -> 3
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 3, "bytes": 180}}]}
+exit_status=0
+$ docker compose exec -T iot-client wget -T 1 -t 1 -qO- http://172.28.20.10:8082/
+wget: download timed out
+exit_status=1
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 4, "bytes": 240}}]}
+exit_status=0
+PASS: iot-client TCP/8082 BLOCKED; iot_to_corporate 3 -> 4
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+$ docker compose exec -T internal-site nginx -c /tmp/lab17-nginx.conf -s quit
+2026/10/30 16:10:01 [notice] 17#17: signal process started
+exit_status=0
+RESULT: PASS RG-01

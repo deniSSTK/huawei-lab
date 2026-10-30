@@ -1,0 +1,24 @@
+[2026-10-30T18:09:44+02:00] NT-04: CSRF and closed/authenticated management boundary
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session -H 'Origin: https://untrusted.example' --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+cross-origin request rejected
+
+HTTP:403
+exit_status=0
+$ docker compose exec -T guest-client curl --noproxy '*' --max-time 2 http://172.28.50.254:9090/grant
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0
+curl: (28) Connection timed out after 2007 milliseconds
+exit_status=28
+$ docker compose exec -T iot-client wget -T 1 -t 1 -qO- http://172.28.50.254:9090/grant
+wget: download timed out
+exit_status=1
+$ docker compose exec -T portal wget -T 2 -qO- http://172.28.50.254:9090/grant
+wget: server returned error: HTTP/1.1 401 Unauthorized
+exit_status=1
+PASS: management API unreachable from Guest/IoT; unauthenticated Portal request rejected
+RESULT: PASS RT-08

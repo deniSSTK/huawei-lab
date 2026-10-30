@@ -1,0 +1,10 @@
+.git
+.idea
+.vscode
+.secrets
+.env
+.env.*
+output
+evidence
+**/__pycache__
+**/*.db*

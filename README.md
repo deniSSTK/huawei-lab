@@ -2,22 +2,28 @@
 
 [Українська версія](README.ua.md)
 
-A Docker Compose proof of concept for separating guest, corporate, and IoT traffic in a university network. A local login portal will identify users, and a Linux gateway will enforce network access rules.
+## Lab 17 stabilization
 
-The current Sprint 2 model adds a gateway Firewall and Guest internet access to the Sprint 1 Docker Compose topology. Guest and IoT requests to Corporate are blocked; forwarding uses Default Deny with explicit Guest web and DNS permissions. The portal, authentication, and role-based grants remain future work. See the [recorded results and logs](evidence/sprint-2/results.md) for validation status.
+Auth Portal, SQLite sessions and timed role grants on the gateway are implemented. See the [current implementation and run instructions](docs/auth-portal.ua.md). Run `python3 scripts/init-secrets.py` before `docker compose up -d --build --wait`; retest with `python3 scripts/check-auth.py`. Lab 17 implementation details and limitations are recorded in the linked document.
+
+
+A Docker Compose proof of concept for separating guest, corporate, and IoT traffic in a university network. A local login portal identifies users, and a Linux gateway enforces network access rules.
+
+The current Sprint 2 model adds a gateway Firewall and Guest internet access to the Sprint 1 Docker Compose topology. Unauthenticated Guest and IoT requests to Corporate are blocked; forwarding uses Default Deny with explicit Guest web and DNS permissions. Lab 17 adds Portal authentication and time-limited role grants for Guest. See the [recorded results and logs](evidence/sprint-2/results.md) for validation status.
 
 ## Running the current network model
 
 With Docker running and Docker Compose 2.33.1 or later available, run from the repository root:
 
 ```bash
+python3 scripts/init-secrets.py
 docker compose config --quiet
 docker compose up -d --build --wait
 sh scripts/check-isolation.sh
 sh scripts/check-internet.sh
 ```
 
-The isolation check verifies that Nginx responds, the gateway reaches the site, both clients reach their gateway, and Guest/IoT requests to `172.28.20.10` fail while the corresponding Firewall drop counters increase. Expected request timeouts are part of successful isolation checks. The internet check fetches `http://example.com/` and `https://example.com/` from Guest, checks the response, validates HTTPS certificates, and requires the gateway's web counter to increase. No host port is published.
+The isolation check verifies that Nginx responds, the gateway reaches the site, both clients reach their gateway, and Guest/IoT requests to `172.28.20.10` fail while the corresponding Firewall drop counters increase. Expected request timeouts are part of successful isolation checks. The internet check fetches `http://example.com/` and `https://example.com/` from Guest, checks the response, validates HTTPS certificates, and requires the gateway's web counter to increase. Portal preview is published on `127.0.0.1:8080`; Corporate resources are not published on the host.
 
 Check that isolation survives container recreation:
 
@@ -39,22 +45,20 @@ Stop the lab with `docker compose down`. See [Sprint 2](sprints/sprint-2.md) for
 
 A client starts with guest access: it can reach the login portal and the internet, but cannot reach internal university services. The portal offers username and password fields, a **Sign in** button, and a **Continue as guest** button.
 
-After a successful login, the portal displays the user's role: **Student**, **Teacher**, or **Admin**. In the full implementation, the portal also asks the gateway to grant that client the network permissions associated with the role. Logging out or reaching the session expiry time removes those permissions.
+After a successful login, the portal displays the user's role: **Student**, **Teacher**, or **Admin**. The portal also asks the gateway to grant that client the network permissions associated with the role. Logging out or reaching the session expiry time removes those permissions.
 
 Guest is the default unauthenticated state. Student, Teacher, and Admin are authenticated user roles. Guest, Corporate, and IoT are network segments; roles and segments are separate concepts. Logging in does not move a client into another Docker network.
 
 ## Selected technology stack
 
-The planned portal backend will use Go with the standard `net/http` package for HTTP handlers, credential checks, sessions, role lookup, and later gateway integration. The frontend will use plain HTML, CSS, and JavaScript for `/login` and the role page, without a frontend framework. SQLite will store test accounts, password hashes, and sessions.
-
-The Go application will serve both the frontend files and the API from a single `portal` container. Routing and firewall enforcement will remain in the separate Linux gateway container. This stack is selected for future implementation; the portal is not part of the current running model.
+The portal uses Go `net/http`, server-rendered HTML/CSS and SQLite with the `go-sqlite3` driver. PBKDF2-HMAC-SHA256 verifies salted password hashes. The separate gateway exposes an authenticated management API on an internal network and applies timed nftables grants. See [implementation details](docs/auth-portal.ua.md).
 
 ## Components
 
 | Component | Purpose |
 | --- | --- |
 | Client | A Docker container representing a user's device. It sends login requests and attempts to reach network resources. |
-| Portal frontend | A JavaScript interface at `/login`, followed by a page showing the current role. |
+| Portal frontend | An HTML/CSS form at `/login`, followed by a page showing the current role. |
 | Portal backend | Checks credentials, creates sessions, associates a client IP with a user and role, and requests gateway permission changes. |
 | SQLite database | Stores test accounts, password hashes, roles, and active session records. Plain-text passwords are not stored. |
 | Gateway / firewall | A Linux container that routes traffic between segments and enforces rules, using `nftables`. |
@@ -107,7 +111,7 @@ For this lab, each simulated device has a distinct fixed IP and one active ident
 
 The initial role demonstration can show **Your role: Student**, **Your role: Teacher**, or **Your role: Admin** after login. This verifies authentication and role assignment, but does not by itself demonstrate network enforcement.
 
-The planned minimum network demonstration distinguishes a guest from an authenticated client: the same internal resource is blocked before login and reachable after login. The [role matrix and portal design](docs/auth-portal.ua.md) define Student access to learning resources, Teacher access to those resources plus the teacher service, and Admin access to all defined test services. Concrete resource addresses/ports and dynamic gateway grants remain implementation work; the role names alone do not define Firewall rules.
+The planned minimum network demonstration distinguishes a guest from an authenticated client: the same internal resource is blocked before login and reachable after login. The [role matrix and portal design](docs/auth-portal.ua.md) define Student access to learning resources, Teacher access to those resources plus the teacher service, and Admin access to all defined test services. Lab 17 implements these resources at `172.28.20.10` on TCP 80, 8081 and 8082 with timed gateway grants.
 
 IoT-to-Corporate isolation is a separate network policy and does not depend on a user signing in.
 
@@ -141,4 +145,4 @@ Sprint scope is kept separately from the overall design:
 - [Sprint 1: network foundation](sprints/sprint-1.md)
 - [Sprint 2: Firewall foundation](sprints/sprint-2.md)
 
-The full design above spans multiple sprints. Sprint 1 establishes the network foundation and selects the role-modeling approach. Sprint 2 adds the Firewall foundation and isolation checks. Automatic firewall changes after login remain subsequent work.
+The full design above spans multiple sprints. Sprint 1 establishes the network foundation and selects the role-modeling approach. Sprint 2 adds the Firewall foundation and isolation checks. Lab 17 continues Sprint 2 with automatic role grants after login.

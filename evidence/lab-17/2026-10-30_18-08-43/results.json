@@ -1,0 +1,74 @@
+[
+  {
+    "id": "RT-01",
+    "description": "NT-04: login page, wrong password and unauthenticated restrictions",
+    "status": "PASS",
+    "evidence": "RT-01.log"
+  },
+  {
+    "id": "RT-02",
+    "description": "NT-04: full Student/Teacher/Admin network port matrix",
+    "status": "PASS",
+    "evidence": "RT-02.log"
+  },
+  {
+    "id": "RT-03",
+    "description": "NT-04: independent device isolation and copied-cookie rejection",
+    "status": "PASS",
+    "evidence": "RT-03.log"
+  },
+  {
+    "id": "RT-04",
+    "description": "NT-04: role downgrade invalidates old session and old grants",
+    "status": "PASS",
+    "evidence": "RT-04.log"
+  },
+  {
+    "id": "RT-05",
+    "description": "NT-04: Logout closes an already established TCP connection",
+    "status": "PASS",
+    "evidence": "RT-05.log"
+  },
+  {
+    "id": "RT-06",
+    "description": "NT-04: session TTL revokes network access",
+    "status": "PASS",
+    "evidence": "RT-06.log"
+  },
+  {
+    "id": "RT-07",
+    "description": "NT-04: gateway TTL revokes access while Portal is stopped",
+    "status": "PASS",
+    "evidence": "RT-07.log"
+  },
+  {
+    "id": "RT-08",
+    "description": "NT-04: CSRF and closed/authenticated management boundary",
+    "status": "PASS",
+    "evidence": "RT-08.log"
+  },
+  {
+    "id": "RT-09",
+    "description": "NT-04: nft failure rejects login; recovery remains fail closed",
+    "status": "PASS",
+    "evidence": "RT-09.log"
+  },
+  {
+    "id": "RG-01",
+    "description": "NT-01/02: alternate port denied, IoT stays isolated even during Admin session",
+    "status": "PASS",
+    "evidence": "RG-01.log"
+  },
+  {
+    "id": "RG-02",
+    "description": "TC-01/02/07: Guest web and Guest/IoT isolation regression",
+    "status": "PASS",
+    "evidence": "RG-02.log"
+  },
+  {
+    "id": "RG-03",
+    "description": "NT-03: gateway restart and full recreation; login and regression after readiness",
+    "status": "PASS",
+    "evidence": "RG-03.log"
+  }
+]

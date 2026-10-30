@@ -1,0 +1,45 @@
+[2026-10-30T18:09:11+02:00] NT-04: session TTL revokes network access
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376563,"role":"teacher"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 70, "bytes": 4667}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+TEACHER service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 76, "bytes": 5068}}]}
+exit_status=0
+PASS: guest-client TCP/8081 ALLOWED; role_allowed 70 -> 76
+Wait 12.2s for configured 12s TTL (no permission refresh)
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 19, "bytes": 1482}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1004 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 20, "bytes": 1542}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 19 -> 20
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 20, "bytes": 1542}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+curl: (28) Connection timed out after 1001 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 21, "bytes": 1602}}]}
+exit_status=0
+PASS: guest-client TCP/8081 BLOCKED; guest_to_corporate 20 -> 21
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session http://172.28.10.20:8080/api/me
+unauthorized
+
+HTTP:401
+exit_status=0
+RESULT: PASS RT-06

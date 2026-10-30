@@ -1,0 +1,25 @@
+$ docker compose up -d --force-recreate --wait gateway portal
+ Container university-network-gateway-1 Recreate 
+ Container university-network-gateway-1 Recreated 
+ Container university-network-portal-1 Recreate 
+ Container university-network-portal-1 Recreated 
+ Container university-network-gateway-1 Starting 
+ Container university-network-gateway-1 Started 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Starting 
+ Container university-network-portal-1 Started 
+ Container university-network-portal-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Healthy
+exit_status=0
+$ docker compose ps
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED          STATUS                   PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         6 seconds ago    Up 5 seconds (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    32 seconds ago   Up 18 seconds            
+university-network-guest-peer-1      university-network-guest-peer     "sh -c 'ip route rep…"   guest-peer      32 seconds ago   Up 18 seconds            
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   32 seconds ago   Up 18 seconds            80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      32 seconds ago   Up 18 seconds            
+university-network-portal-1          university-network-portal         "/usr/local/bin/port…"   portal          6 seconds ago    Up 2 seconds (healthy)   127.0.0.1:8080->8080/tcp
+exit_status=0

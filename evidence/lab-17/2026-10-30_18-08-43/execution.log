@@ -1,0 +1,1432 @@
+Lab 17 started 2026-10-30_18-08-43 Europe/Kiev
+$ git rev-parse HEAD
+56855fd9553a88e8f9ceef42b8db6577127a92da
+exit_status=0
+$ git status --short
+ M .gitignore
+ M client/Dockerfile
+ M docker-compose.yml
+ M gateway/Dockerfile
+ M gateway/entrypoint.sh
+ M gateway/nftables.conf
+?? .dockerignore
+?? .env.example
+?? auth/
+?? evidence/lab-17/
+?? internal-site/
+?? scripts/check-auth.py
+?? scripts/init-secrets.py
+exit_status=0
+$ docker version
+Client:
+ Version:           29.4.0
+ API version:       1.54
+ Go version:        go1.26.4
+ Git commit:        9d7ad9f
+ Built:             Fri Aug  7 04:38:56 2026
+ OS/Arch:           darwin/arm64
+ Context:           orbstack
+
+Server: Docker Engine - Community
+ Engine:
+  Version:          29.4.0
+  API version:      1.54 (minimum version 1.40)
+  Go version:       go1.26.1
+  Git commit:       daa0cb7f
+  Built:            Tue Apr  7 08:35:43 2026
+  OS/Arch:          linux/arm64
+  Experimental:     true
+ containerd:
+  Version:          v2.2.2
+  GitCommit:        301b2dac98f15c27117da5c8af12118a041a31d9
+ runc:
+  Version:          1.5.1
+  GitCommit:        bb14dabeb7185bb72c8c86735d090dcb20f36587
+ docker-init:
+  Version:          0.19.0
+  GitCommit:        de40ad0
+exit_status=0
+$ docker compose version
+Docker Compose version v5.1.2
+exit_status=0
+$ docker compose config
+name: university-network
+services:
+  gateway:
+    build:
+      context: /workspace/huawei-lab
+      dockerfile: gateway/Dockerfile
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test $$(cat /proc/sys/net/ipv4/ip_forward) = 1 && nft list chain inet lab_filter forward >/dev/null && nft list chain ip lab_nat postrouting >/dev/null
+      timeout: 2s
+      interval: 2s
+      retries: 10
+    networks:
+      corporate:
+        ipv4_address: 172.28.20.254
+      guest:
+        ipv4_address: 172.28.10.254
+      iot:
+        ipv4_address: 172.28.30.254
+      management:
+        ipv4_address: 172.28.50.254
+      uplink:
+        gw_priority: 1
+        ipv4_address: 172.28.40.254
+    secrets:
+      - source: gateway_token
+        target: /run/secrets/gateway_token
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    volumes:
+      - type: bind
+        source: /workspace/huawei-lab/gateway/nftables.conf
+        target: /etc/nftables.conf
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /workspace/huawei-lab/gateway/nat.conf
+        target: /etc/nat.conf
+        read_only: true
+        bind: {}
+  guest-client:
+    build:
+      context: /workspace/huawei-lab/client
+      dockerfile: Dockerfile
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.10.254
+        exec sleep infinity
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    networks:
+      guest:
+        ipv4_address: 172.28.10.10
+  guest-peer:
+    build:
+      context: /workspace/huawei-lab/client
+      dockerfile: Dockerfile
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - ip route replace default via 172.28.10.254; exec sleep infinity
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    networks:
+      guest:
+        ipv4_address: 172.28.10.11
+  internal-site:
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.20.254
+        exec nginx -g 'daemon off;'
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    image: nginx:stable-alpine
+    networks:
+      corporate:
+        ipv4_address: 172.28.20.10
+    volumes:
+      - type: bind
+        source: /workspace/huawei-lab/internal-site/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind: {}
+  iot-client:
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.30.254
+        exec sleep infinity
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    image: alpine:3.22
+    networks:
+      iot:
+        ipv4_address: 172.28.30.10
+  portal:
+    build:
+      context: /workspace/huawei-lab
+      dockerfile: auth/Dockerfile
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    environment:
+      COOKIE_SECURE: "false"
+      SESSION_TTL_SECONDS: "300"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://127.0.0.1:8080/healthz
+      timeout: 2s
+      interval: 2s
+      retries: 15
+    networks:
+      guest:
+        ipv4_address: 172.28.10.20
+      management:
+        ipv4_address: 172.28.50.10
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 8080
+        published: "8080"
+        protocol: tcp
+    secrets:
+      - source: gateway_token
+        target: /run/secrets/gateway_token
+      - source: test_users
+        target: /run/secrets/test_users
+    volumes:
+      - type: volume
+        source: portal-data
+        target: /data
+        volume: {}
+networks:
+  corporate:
+    name: university-network_corporate
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.20.0/24
+          gateway: 172.28.20.1
+  guest:
+    name: university-network_guest
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.10.0/24
+          gateway: 172.28.10.1
+  iot:
+    name: university-network_iot
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.30.0/24
+          gateway: 172.28.30.1
+  management:
+    name: university-network_management
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.50.0/24
+          gateway: 172.28.50.1
+    internal: true
+  uplink:
+    name: university-network_uplink
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.40.0/24
+          gateway: 172.28.40.1
+volumes:
+  portal-data:
+    name: university-network_portal-data
+secrets:
+  gateway_token:
+    name: university-network_gateway_token
+    file: /workspace/huawei-lab/.secrets/gateway-token
+  test_users:
+    name: university-network_test_users
+    file: /workspace/huawei-lab/.secrets/test-users.json
+exit_status=0
+Test override: SESSION_TTL_SECONDS=12; default TTL=300
+$ docker compose up -d --force-recreate --wait portal
+ Container university-network-gateway-1 Running 
+ Container university-network-portal-1 Recreate 
+ Container university-network-portal-1 Recreated 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Starting 
+ Container university-network-portal-1 Started 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-portal-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Healthy
+exit_status=0
+$ docker compose ps
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED              STATUS                        PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         About a minute ago   Up About a minute (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    About a minute ago   Up About a minute             
+university-network-guest-peer-1      university-network-guest-peer     "sh -c 'ip route rep…"   guest-peer      About a minute ago   Up About a minute             
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   3 minutes ago        Up 3 minutes                  80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      2 days ago           Up 3 minutes                  
+university-network-portal-1          university-network-portal         "/usr/local/bin/port…"   portal          3 seconds ago        Up 2 seconds (healthy)        127.0.0.1:8080->8080/tcp
+exit_status=0
+[2026-10-30T18:08:47+02:00] NT-04: login page, wrong password and unauthenticated restrictions
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' http://172.28.10.20:8080/login
+<!doctype html><html lang="uk"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>University Access</title><style>body{font:17px system-ui;background:#f5f6fa;color:#172133;max-width:650px;margin:7vh auto;padding:24px}main{background:white;padding:36px;border-radius:16px}h1{font-size:32px;margin-top:0}label{display:block;margin:18px 0}input{display:block;padding:12px;border:1px solid #aab3c2;border-radius:6px;width:90%;font:inherit}button{padding:12px 22px;background:#234ac4;color:white;border:0;border-radius:6px;font:inherit}a{color:#234ac4}li{margin:12px 0}small{color:#536076}</style><main><h1>Університетська мережа</h1><p>Увійдіть з Guest пристрою, щоб отримати доступ за своєю роллю.</p><form method="post" action="/api/login"><label>Логін<input name="username" required autocomplete="username"></label><label>Пароль<input name="password" type="password" required autocomplete="current-password"></label><button>Увійти</button></form><p><a href="https://example.com/">Продовжити як гість</a></p><small>Доступ гостя до інтернету зберігається. Сесія діє 12 секунд.</small></main></html>
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway wget -T 2 -qO- http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1005 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 1, "bytes": 60}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 0 -> 1
+$ docker compose exec -T gateway wget -T 2 -qO- http://172.28.20.10:8081/
+TEACHER service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 1, "bytes": 60}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 2, "bytes": 120}}]}
+exit_status=0
+PASS: guest-client TCP/8081 BLOCKED; guest_to_corporate 1 -> 2
+$ docker compose exec -T gateway wget -T 2 -qO- http://172.28.20.10:8082/
+ADMIN service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 2, "bytes": 120}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8082/
+curl: (28) Connection timed out after 1005 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 3, "bytes": 180}}]}
+exit_status=0
+PASS: guest-client TCP/8082 BLOCKED; guest_to_corporate 2 -> 3
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+invalid credentials
+
+HTTP:401
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session http://172.28.10.20:8080/api/me
+unauthorized
+
+HTTP:401
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 3, "bytes": 180}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 4, "bytes": 240}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 3 -> 4
+RESULT: PASS RT-01
+[2026-10-30T18:08:53+02:00] NT-04: full Student/Teacher/Admin network port matrix
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376545,"role":"student"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 6, "bytes": 396}}]}
+exit_status=0
+PASS: guest-client TCP/80 ALLOWED; role_allowed 0 -> 6
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 4, "bytes": 240}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+curl: (28) Connection timed out after 1004 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 5, "bytes": 300}}]}
+exit_status=0
+PASS: guest-client TCP/8081 BLOCKED; guest_to_corporate 4 -> 5
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 5, "bytes": 300}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8082/
+curl: (28) Connection timed out after 1003 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 6, "bytes": 360}}]}
+exit_status=0
+PASS: guest-client TCP/8082 BLOCKED; guest_to_corporate 5 -> 6
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376548,"role":"teacher"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 6, "bytes": 396}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 12, "bytes": 792}}]}
+exit_status=0
+PASS: guest-client TCP/80 ALLOWED; role_allowed 6 -> 12
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 12, "bytes": 792}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+TEACHER service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 18, "bytes": 1193}}]}
+exit_status=0
+PASS: guest-client TCP/8081 ALLOWED; role_allowed 12 -> 18
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 6, "bytes": 360}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8082/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 7, "bytes": 420}}]}
+exit_status=0
+PASS: guest-client TCP/8082 BLOCKED; guest_to_corporate 6 -> 7
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376550,"role":"admin"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 18, "bytes": 1193}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 24, "bytes": 1589}}]}
+exit_status=0
+PASS: guest-client TCP/80 ALLOWED; role_allowed 18 -> 24
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 24, "bytes": 1589}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+TEACHER service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 30, "bytes": 1990}}]}
+exit_status=0
+PASS: guest-client TCP/8081 ALLOWED; role_allowed 24 -> 30
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 30, "bytes": 1990}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8082/
+ADMIN service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 36, "bytes": 2391}}]}
+exit_status=0
+PASS: guest-client TCP/8082 ALLOWED; role_allowed 30 -> 36
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+RESULT: PASS RT-02
+[2026-10-30T18:08:59+02:00] NT-04: independent device isolation and copied-cookie rejection
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376551,"role":"admin"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 36, "bytes": 2391}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8082/
+ADMIN service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 42, "bytes": 2792}}]}
+exit_status=0
+PASS: guest-client TCP/8082 ALLOWED; role_allowed 36 -> 42
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 7, "bytes": 420}}]}
+exit_status=0
+$ docker compose exec -T guest-peer curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1003 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 8, "bytes": 480}}]}
+exit_status=0
+PASS: guest-peer TCP/80 BLOCKED; guest_to_corporate 7 -> 8
+$ docker compose exec -T guest-peer curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-copied -c /tmp/lab17-copied http://172.28.10.20:8080/api/me
+unauthorized
+
+HTTP:401
+exit_status=0
+PASS: copied session cookie rejected on a second Guest IP; token omitted from evidence
+$ docker compose exec -T guest-peer curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-peer -c /tmp/lab17-peer --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376553,"role":"student"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 42, "bytes": 2792}}]}
+exit_status=0
+$ docker compose exec -T guest-peer curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 48, "bytes": 3188}}]}
+exit_status=0
+PASS: guest-peer TCP/80 ALLOWED; role_allowed 42 -> 48
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 48, "bytes": 3188}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8082/
+ADMIN service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 54, "bytes": 3589}}]}
+exit_status=0
+PASS: guest-client TCP/8082 ALLOWED; role_allowed 48 -> 54
+$ docker compose exec -T guest-peer curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-peer -c /tmp/lab17-peer --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 8, "bytes": 480}}]}
+exit_status=0
+$ docker compose exec -T guest-peer curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 9, "bytes": 540}}]}
+exit_status=0
+PASS: guest-peer TCP/80 BLOCKED; guest_to_corporate 8 -> 9
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 54, "bytes": 3589}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8082/
+ADMIN service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 60, "bytes": 3990}}]}
+exit_status=0
+PASS: guest-client TCP/8082 ALLOWED; role_allowed 54 -> 60
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+RESULT: PASS RT-03
+[2026-10-30T18:09:03+02:00] NT-04: role downgrade invalidates old session and old grants
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-old-admin -c /tmp/lab17-old-admin --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376555,"role":"admin"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376555,"role":"student"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-old-admin -c /tmp/lab17-old-admin http://172.28.10.20:8080/api/me
+unauthorized
+
+HTTP:401
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 60, "bytes": 3990}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 66, "bytes": 4386}}]}
+exit_status=0
+PASS: guest-client TCP/80 ALLOWED; role_allowed 60 -> 66
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 9, "bytes": 540}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+curl: (28) Connection timed out after 1001 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 10, "bytes": 600}}]}
+exit_status=0
+PASS: guest-client TCP/8081 BLOCKED; guest_to_corporate 9 -> 10
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 10, "bytes": 600}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8082/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 11, "bytes": 660}}]}
+exit_status=0
+PASS: guest-client TCP/8082 BLOCKED; guest_to_corporate 10 -> 11
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 11, "bytes": 660}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 12, "bytes": 720}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 11 -> 12
+RESULT: PASS RT-04
+[2026-10-30T18:09:07+02:00] NT-04: Logout closes an already established TCP connection
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 12, "bytes": 720}}]}
+exit_status=0
+$ docker compose exec -T guest-client python3 -
+PASS: same established TCP connection blocked after Logout
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 17, "bytes": 1305}}]}
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 17, "bytes": 1305}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1005 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 19, "bytes": 1482}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 17 -> 19
+RESULT: PASS RT-05
+[2026-10-30T18:09:11+02:00] NT-04: session TTL revokes network access
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376563,"role":"teacher"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 70, "bytes": 4667}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+TEACHER service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 76, "bytes": 5068}}]}
+exit_status=0
+PASS: guest-client TCP/8081 ALLOWED; role_allowed 70 -> 76
+Wait 12.2s for configured 12s TTL (no permission refresh)
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 19, "bytes": 1482}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1004 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 20, "bytes": 1542}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 19 -> 20
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 20, "bytes": 1542}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+curl: (28) Connection timed out after 1001 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 21, "bytes": 1602}}]}
+exit_status=0
+PASS: guest-client TCP/8081 BLOCKED; guest_to_corporate 20 -> 21
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session http://172.28.10.20:8080/api/me
+unauthorized
+
+HTTP:401
+exit_status=0
+RESULT: PASS RT-06
+[2026-10-30T18:09:26+02:00] NT-04: gateway TTL revokes access while Portal is stopped
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376578,"role":"teacher"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 78, "bytes": 5225}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+TEACHER service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 84, "bytes": 5626}}]}
+exit_status=0
+PASS: guest-client TCP/8081 ALLOWED; role_allowed 78 -> 84
+$ docker compose stop portal
+ Container university-network-portal-1 Stopping 
+ Container university-network-portal-1 Stopped
+exit_status=0
+Wait 11.6s for configured 12s TTL (no permission refresh)
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 21, "bytes": 1602}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 22, "bytes": 1662}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 21 -> 22
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 22, "bytes": 1662}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 23, "bytes": 1722}}]}
+exit_status=0
+PASS: guest-client TCP/8081 BLOCKED; guest_to_corporate 22 -> 23
+$ docker compose up -d --wait portal
+ Container university-network-gateway-1 Running 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Starting 
+ Container university-network-portal-1 Started 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-portal-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Healthy
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session http://172.28.10.20:8080/api/me
+unauthorized
+
+HTTP:401
+exit_status=0
+RESULT: PASS RT-07
+[2026-10-30T18:09:44+02:00] NT-04: CSRF and closed/authenticated management boundary
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session -H 'Origin: https://untrusted.example' --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+cross-origin request rejected
+
+HTTP:403
+exit_status=0
+$ docker compose exec -T guest-client curl --noproxy '*' --max-time 2 http://172.28.50.254:9090/grant
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0
+  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0
+curl: (28) Connection timed out after 2007 milliseconds
+exit_status=28
+$ docker compose exec -T iot-client wget -T 1 -t 1 -qO- http://172.28.50.254:9090/grant
+wget: download timed out
+exit_status=1
+$ docker compose exec -T portal wget -T 2 -qO- http://172.28.50.254:9090/grant
+wget: server returned error: HTTP/1.1 401 Unauthorized
+exit_status=1
+PASS: management API unreachable from Guest/IoT; unauthenticated Portal request rejected
+RESULT: PASS RT-08
+[2026-10-30T18:09:48+02:00] NT-04: nft failure rejects login; recovery remains fail closed
+$ docker compose exec -T gateway nft flush chain inet lab_filter forward
+
+exit_status=0
+$ docker compose exec -T gateway nft delete set inet lab_filter role_access
+
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+gateway unavailable
+
+HTTP:503
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session http://172.28.10.20:8080/api/me
+unauthorized
+
+HTTP:401
+exit_status=0
+$ docker compose restart gateway
+ Container university-network-gateway-1 Restarting 
+ Container university-network-gateway-1 Started
+exit_status=0
+$ docker compose up -d --wait
+ Container university-network-gateway-1 Running 
+ Container university-network-internal-site-1 Running 
+ Container university-network-guest-peer-1 Running 
+ Container university-network-iot-client-1 Running 
+ Container university-network-portal-1 Running 
+ Container university-network-guest-client-1 Running 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-guest-peer-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-portal-1 Waiting 
+ Container university-network-guest-client-1 Waiting 
+ Container university-network-internal-site-1 Waiting 
+ Container university-network-iot-client-1 Waiting 
+ Container university-network-portal-1 Healthy 
+ Container university-network-iot-client-1 Healthy 
+ Container university-network-guest-client-1 Healthy 
+ Container university-network-guest-peer-1 Healthy 
+ Container university-network-internal-site-1 Healthy 
+ Container university-network-gateway-1 Healthy
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 1, "bytes": 60}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 0 -> 1
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376605,"role":"student"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 6, "bytes": 396}}]}
+exit_status=0
+PASS: guest-client TCP/80 ALLOWED; role_allowed 0 -> 6
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+RESULT: PASS RT-09
+[2026-10-30T18:09:53+02:00] NT-01/02: alternate port denied, IoT stays isolated even during Admin session
+$ docker compose exec -T internal-site sh -c 'cat > /tmp/lab17-nginx.conf; nginx -c /tmp/lab17-nginx.conf'
+
+exit_status=0
+$ docker compose exec -T gateway wget -T 2 -qO- http://172.28.20.10:8080/
+ALTERNATE probe
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 1, "bytes": 60}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8080/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 2, "bytes": 120}}]}
+exit_status=0
+PASS: guest-client TCP/8080 BLOCKED; guest_to_corporate 1 -> 2
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T iot-client wget -T 1 -t 1 -qO- http://172.28.20.10:8080/
+wget: download timed out
+exit_status=1
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 1, "bytes": 60}}]}
+exit_status=0
+PASS: iot-client TCP/8080 BLOCKED; iot_to_corporate 0 -> 1
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376608,"role":"admin"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 2, "bytes": 120}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8080/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 3, "bytes": 180}}]}
+exit_status=0
+PASS: guest-client TCP/8080 BLOCKED; guest_to_corporate 2 -> 3
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 1, "bytes": 60}}]}
+exit_status=0
+$ docker compose exec -T iot-client wget -T 1 -t 1 -qO- http://172.28.20.10:80/
+wget: download timed out
+exit_status=1
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 2, "bytes": 120}}]}
+exit_status=0
+PASS: iot-client TCP/80 BLOCKED; iot_to_corporate 1 -> 2
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 2, "bytes": 120}}]}
+exit_status=0
+$ docker compose exec -T iot-client wget -T 1 -t 1 -qO- http://172.28.20.10:8081/
+wget: download timed out
+exit_status=1
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 3, "bytes": 180}}]}
+exit_status=0
+PASS: iot-client TCP/8081 BLOCKED; iot_to_corporate 2 -> 3
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 3, "bytes": 180}}]}
+exit_status=0
+$ docker compose exec -T iot-client wget -T 1 -t 1 -qO- http://172.28.20.10:8082/
+wget: download timed out
+exit_status=1
+$ docker compose exec -T gateway nft -j list counter inet lab_filter iot_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "iot_to_corporate", "table": "lab_filter", "handle": 4, "packets": 4, "bytes": 240}}]}
+exit_status=0
+PASS: iot-client TCP/8082 BLOCKED; iot_to_corporate 3 -> 4
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+$ docker compose exec -T internal-site nginx -c /tmp/lab17-nginx.conf -s quit
+2026/10/30 16:10:01 [notice] 17#17: signal process started
+exit_status=0
+RESULT: PASS RG-01
+[2026-10-30T18:10:01+02:00] TC-01/02/07: Guest web and Guest/IoT isolation regression
+$ sh scripts/check-isolation.sh
+STUDENT learning materials
+
+PASS: Internal Site responds inside Corporate
+STUDENT learning materials
+
+PASS: Gateway reaches Internal Site
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.144 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.144/0.144/0.144 ms
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.146 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.146/0.146/0.146 ms
+wget: download timed out
+PASS: guest-client blocked; guest_to_corporate packets 3 -> 6
+wget: download timed out
+PASS: iot-client blocked; iot_to_corporate packets 4 -> 7
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 6 bytes 360
+	}
+
+	counter iot_to_corporate {
+		packets 7 bytes 420
+	}
+
+	counter guest_to_internet {
+		packets 0 bytes 0
+	}
+
+	counter guest_dns {
+		packets 0 bytes 0
+	}
+
+	counter default_deny {
+		packets 0 bytes 0
+	}
+
+	counter role_allowed {
+		packets 6 bytes 396
+	}
+
+	set role_access {
+		type ipv4_addr . inet_service
+		flags timeout
+	}
+
+	chain input {
+		type filter hook input priority filter; policy accept;
+		ip saddr 172.28.50.10 ip daddr 172.28.50.254 tcp dport 9090 accept
+		tcp dport 9090 drop
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ct state invalid drop
+		ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.10 ip saddr . tcp dport @role_access counter name "role_allowed" accept
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
+		ip saddr 172.28.10.0/24 oifname "eth1" tcp dport { 80, 443 } counter name "guest_to_internet" accept
+		ip saddr 172.28.10.0/24 oifname "eth1" udp dport 53 counter name "guest_dns" accept
+		ip saddr 172.28.10.0/24 oifname "eth1" tcp dport 53 counter name "guest_dns" accept
+		ct state established,related accept
+		counter name "default_deny" drop
+	}
+}
+exit_status=0
+$ sh scripts/check-internet.sh
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+PASS: Guest default route uses the lab Gateway
+default via 172.28.40.1 dev eth1 
+172.28.10.0/24 dev eth3 scope link  src 172.28.10.254 
+172.28.20.0/24 dev eth2 scope link  src 172.28.20.254 
+172.28.30.0/24 dev eth4 scope link  src 172.28.30.254 
+172.28.40.0/24 dev eth1 scope link  src 172.28.40.254 
+172.28.50.0/24 dev eth0 scope link  src 172.28.50.254 
+PASS: Gateway default route uses the uplink
+PASS: Guest fetched http://example.com/ (Example Domain); guest_to_internet packets 0 -> 6
+PASS: Guest fetched https://example.com/ (Example Domain); guest_to_internet packets 6 -> 18
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 18 bytes 2895
+	}
+}
+table ip lab_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.28.10.0/24 oifname "eth1" counter packets 2 bytes 120 masquerade
+	}
+}
+exit_status=0
+RESULT: PASS RG-02
+[2026-10-30T18:10:09+02:00] NT-03: gateway restart and full recreation; login and regression after readiness
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376621,"role":"student"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 6, "bytes": 396}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 12, "bytes": 792}}]}
+exit_status=0
+PASS: guest-client TCP/80 ALLOWED; role_allowed 6 -> 12
+$ docker compose restart gateway
+ Container university-network-gateway-1 Restarting 
+ Container university-network-gateway-1 Started
+exit_status=0
+$ docker compose up -d --wait
+ Container university-network-gateway-1 Running 
+ Container university-network-guest-client-1 Running 
+ Container university-network-iot-client-1 Running 
+ Container university-network-portal-1 Running 
+ Container university-network-guest-peer-1 Running 
+ Container university-network-internal-site-1 Running 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-internal-site-1 Waiting 
+ Container university-network-iot-client-1 Waiting 
+ Container university-network-guest-peer-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-portal-1 Waiting 
+ Container university-network-guest-client-1 Waiting 
+ Container university-network-guest-peer-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-internal-site-1 Healthy 
+ Container university-network-portal-1 Healthy 
+ Container university-network-guest-client-1 Healthy 
+ Container university-network-iot-client-1 Healthy
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1006 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 1, "bytes": 60}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 0 -> 1
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376626,"role":"student"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+STUDENT learning materials
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 6, "bytes": 396}}]}
+exit_status=0
+PASS: guest-client TCP/80 ALLOWED; role_allowed 0 -> 6
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+$ sh scripts/check-isolation.sh
+STUDENT learning materials
+
+PASS: Internal Site responds inside Corporate
+STUDENT learning materials
+
+PASS: Gateway reaches Internal Site
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.118 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.118/0.118/0.118 ms
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.081 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.081/0.081/0.081 ms
+wget: download timed out
+PASS: guest-client blocked; guest_to_corporate packets 1 -> 4
+wget: download timed out
+PASS: iot-client blocked; iot_to_corporate packets 0 -> 3
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 4 bytes 240
+	}
+
+	counter iot_to_corporate {
+		packets 3 bytes 180
+	}
+
+	counter guest_to_internet {
+		packets 0 bytes 0
+	}
+
+	counter guest_dns {
+		packets 0 bytes 0
+	}
+
+	counter default_deny {
+		packets 0 bytes 0
+	}
+
+	counter role_allowed {
+		packets 6 bytes 396
+	}
+
+	set role_access {
+		type ipv4_addr . inet_service
+		flags timeout
+	}
+
+	chain input {
+		type filter hook input priority filter; policy accept;
+		ip saddr 172.28.50.10 ip daddr 172.28.50.254 tcp dport 9090 accept
+		tcp dport 9090 drop
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ct state invalid drop
+		ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.10 ip saddr . tcp dport @role_access counter name "role_allowed" accept
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
+		ip saddr 172.28.10.0/24 oifname "eth4" tcp dport { 80, 443 } counter name "guest_to_internet" accept
+		ip saddr 172.28.10.0/24 oifname "eth4" udp dport 53 counter name "guest_dns" accept
+		ip saddr 172.28.10.0/24 oifname "eth4" tcp dport 53 counter name "guest_dns" accept
+		ct state established,related accept
+		counter name "default_deny" drop
+	}
+}
+exit_status=0
+$ sh scripts/check-internet.sh
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+PASS: Guest default route uses the lab Gateway
+default via 172.28.40.1 dev eth4 
+172.28.10.0/24 dev eth1 scope link  src 172.28.10.254 
+172.28.20.0/24 dev eth0 scope link  src 172.28.20.254 
+172.28.30.0/24 dev eth2 scope link  src 172.28.30.254 
+172.28.40.0/24 dev eth4 scope link  src 172.28.40.254 
+172.28.50.0/24 dev eth3 scope link  src 172.28.50.254 
+PASS: Gateway default route uses the uplink
+PASS: Guest fetched http://example.com/ (Example Domain); guest_to_internet packets 0 -> 6
+PASS: Guest fetched https://example.com/ (Example Domain); guest_to_internet packets 6 -> 19
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 19 bytes 2995
+	}
+}
+table ip lab_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.28.10.0/24 oifname "eth4" counter packets 2 bytes 120 masquerade
+	}
+}
+exit_status=0
+$ docker compose up -d --force-recreate --wait
+ Container university-network-gateway-1 Recreate 
+ Container university-network-gateway-1 Recreated 
+ Container university-network-portal-1 Recreate 
+ Container university-network-guest-client-1 Recreate 
+ Container university-network-internal-site-1 Recreate 
+ Container university-network-guest-peer-1 Recreate 
+ Container university-network-iot-client-1 Recreate 
+ Container university-network-internal-site-1 Recreated 
+ Container university-network-portal-1 Recreated 
+ Container university-network-guest-peer-1 Recreated 
+ Container university-network-iot-client-1 Recreated 
+ Container university-network-guest-client-1 Recreated 
+ Container university-network-gateway-1 Starting 
+ Container university-network-gateway-1 Started 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Starting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-iot-client-1 Starting 
+ Container university-network-internal-site-1 Starting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-guest-client-1 Starting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-guest-peer-1 Starting 
+ Container university-network-internal-site-1 Started 
+ Container university-network-guest-client-1 Started 
+ Container university-network-guest-peer-1 Started 
+ Container university-network-iot-client-1 Started 
+ Container university-network-portal-1 Started 
+ Container university-network-guest-peer-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-portal-1 Waiting 
+ Container university-network-guest-client-1 Waiting 
+ Container university-network-internal-site-1 Waiting 
+ Container university-network-iot-client-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-internal-site-1 Healthy 
+ Container university-network-guest-client-1 Healthy 
+ Container university-network-iot-client-1 Healthy 
+ Container university-network-guest-peer-1 Healthy 
+ Container university-network-portal-1 Healthy
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:80/
+curl: (28) Connection timed out after 1002 milliseconds
+exit_status=28
+$ docker compose exec -T gateway nft -j list counter inet lab_filter guest_to_corporate
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "guest_to_corporate", "table": "lab_filter", "handle": 3, "packets": 1, "bytes": 60}}]}
+exit_status=0
+PASS: guest-client TCP/80 BLOCKED; guest_to_corporate 0 -> 1
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/login
+{"expires":1793376653,"role":"teacher"}
+
+HTTP:200
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 0, "bytes": 0}}]}
+exit_status=0
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -fsS --connect-timeout 1 --max-time 2 http://172.28.20.10:8081/
+TEACHER service
+exit_status=0
+$ docker compose exec -T gateway nft -j list counter inet lab_filter role_allowed
+{"nftables": [{"metainfo": {"version": "1.1.3", "release_name": "Commodore Bullmoose #4", "json_schema_version": 1}}, {"counter": {"family": "inet", "name": "role_allowed", "table": "lab_filter", "handle": 8, "packets": 6, "bytes": 401}}]}
+exit_status=0
+PASS: guest-client TCP/8081 ALLOWED; role_allowed 0 -> 6
+$ docker compose exec -T guest-client curl -4 --noproxy '*' -sS --max-time 5 -H 'Accept: application/json' -w '
+HTTP:%{http_code}' -b /tmp/lab17-session -c /tmp/lab17-session --data-binary @- -H 'Content-Type: application/x-www-form-urlencoded' http://172.28.10.20:8080/api/logout
+
+HTTP:204
+exit_status=0
+$ sh scripts/check-isolation.sh
+STUDENT learning materials
+
+PASS: Internal Site responds inside Corporate
+STUDENT learning materials
+
+PASS: Gateway reaches Internal Site
+PING 172.28.10.254 (172.28.10.254): 56 data bytes
+64 bytes from 172.28.10.254: seq=0 ttl=64 time=0.127 ms
+
+--- 172.28.10.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.127/0.127/0.127 ms
+PING 172.28.30.254 (172.28.30.254): 56 data bytes
+64 bytes from 172.28.30.254: seq=0 ttl=64 time=0.153 ms
+
+--- 172.28.30.254 ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 0.153/0.153/0.153 ms
+wget: download timed out
+PASS: guest-client blocked; guest_to_corporate packets 1 -> 4
+wget: download timed out
+PASS: iot-client blocked; iot_to_corporate packets 0 -> 3
+table inet lab_filter {
+	counter guest_to_corporate {
+		packets 4 bytes 240
+	}
+
+	counter iot_to_corporate {
+		packets 3 bytes 180
+	}
+
+	counter guest_to_internet {
+		packets 0 bytes 0
+	}
+
+	counter guest_dns {
+		packets 0 bytes 0
+	}
+
+	counter default_deny {
+		packets 0 bytes 0
+	}
+
+	counter role_allowed {
+		packets 6 bytes 401
+	}
+
+	set role_access {
+		type ipv4_addr . inet_service
+		flags timeout
+	}
+
+	chain input {
+		type filter hook input priority filter; policy accept;
+		ip saddr 172.28.50.10 ip daddr 172.28.50.254 tcp dport 9090 accept
+		tcp dport 9090 drop
+	}
+
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ct state invalid drop
+		ip saddr 172.28.30.0/24 ip daddr 172.28.20.0/24 counter name "iot_to_corporate" drop
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.10 ip saddr . tcp dport @role_access counter name "role_allowed" accept
+		ip saddr 172.28.10.0/24 ip daddr 172.28.20.0/24 counter name "guest_to_corporate" drop
+		ip saddr 172.28.10.0/24 oifname "eth4" tcp dport { 80, 443 } counter name "guest_to_internet" accept
+		ip saddr 172.28.10.0/24 oifname "eth4" udp dport 53 counter name "guest_dns" accept
+		ip saddr 172.28.10.0/24 oifname "eth4" tcp dport 53 counter name "guest_dns" accept
+		ct state established,related accept
+		counter name "default_deny" drop
+	}
+}
+exit_status=0
+$ sh scripts/check-internet.sh
+default via 172.28.10.254 dev eth0 
+172.28.10.0/24 dev eth0 scope link  src 172.28.10.10 
+PASS: Guest default route uses the lab Gateway
+default via 172.28.40.1 dev eth4 
+172.28.10.0/24 dev eth1 scope link  src 172.28.10.254 
+172.28.20.0/24 dev eth0 scope link  src 172.28.20.254 
+172.28.30.0/24 dev eth2 scope link  src 172.28.30.254 
+172.28.40.0/24 dev eth4 scope link  src 172.28.40.254 
+172.28.50.0/24 dev eth3 scope link  src 172.28.50.254 
+PASS: Gateway default route uses the uplink
+PASS: Guest fetched http://example.com/ (Example Domain); guest_to_internet packets 0 -> 6
+PASS: Guest fetched https://example.com/ (Example Domain); guest_to_internet packets 6 -> 18
+table inet lab_filter {
+	counter guest_to_internet {
+		packets 18 bytes 2895
+	}
+}
+table ip lab_nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		ip saddr 172.28.10.0/24 oifname "eth4" counter packets 2 bytes 120 masquerade
+	}
+}
+exit_status=0
+RESULT: PASS RG-03
+$ docker compose up -d --force-recreate --wait gateway portal
+ Container university-network-gateway-1 Recreate 
+ Container university-network-gateway-1 Recreated 
+ Container university-network-portal-1 Recreate 
+ Container university-network-portal-1 Recreated 
+ Container university-network-gateway-1 Starting 
+ Container university-network-gateway-1 Started 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Starting 
+ Container university-network-portal-1 Started 
+ Container university-network-portal-1 Waiting 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Healthy
+exit_status=0
+$ docker compose ps
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED          STATUS                   PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         6 seconds ago    Up 5 seconds (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    32 seconds ago   Up 18 seconds            
+university-network-guest-peer-1      university-network-guest-peer     "sh -c 'ip route rep…"   guest-peer      32 seconds ago   Up 18 seconds            
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   32 seconds ago   Up 18 seconds            80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      32 seconds ago   Up 18 seconds            
+university-network-portal-1          university-network-portal         "/usr/local/bin/port…"   portal          6 seconds ago    Up 2 seconds (healthy)   127.0.0.1:8080->8080/tcp
+exit_status=0

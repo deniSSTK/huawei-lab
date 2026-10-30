@@ -1,0 +1,62 @@
+[
+  {
+    "id": "RT-01",
+    "expected": "NT-04: login page, wrong password and unauthenticated restrictions",
+    "status": "PASS"
+  },
+  {
+    "id": "RT-02",
+    "expected": "NT-04: full Student/Teacher/Admin network port matrix",
+    "status": "PASS"
+  },
+  {
+    "id": "RT-03",
+    "expected": "NT-04: independent device isolation and copied-cookie rejection",
+    "status": "PASS"
+  },
+  {
+    "id": "RT-04",
+    "expected": "NT-04: role downgrade invalidates old session and old grants",
+    "status": "PASS"
+  },
+  {
+    "id": "RT-05",
+    "expected": "NT-04: Logout closes an already established TCP connection",
+    "status": "PASS"
+  },
+  {
+    "id": "RT-06",
+    "expected": "NT-04: session TTL revokes network access",
+    "status": "PASS"
+  },
+  {
+    "id": "RT-07",
+    "expected": "NT-04: gateway TTL revokes access while Portal is stopped",
+    "status": "PASS"
+  },
+  {
+    "id": "RT-08",
+    "expected": "NT-04: CSRF and closed/authenticated management boundary",
+    "status": "PASS"
+  },
+  {
+    "id": "RT-09",
+    "expected": "NT-04: nft failure rejects login; recovery remains fail closed",
+    "status": "PASS"
+  },
+  {
+    "id": "RG-01",
+    "expected": "NT-01/02: alternate port denied, IoT stays isolated even during Admin session",
+    "status": "PASS"
+  },
+  {
+    "id": "RG-02",
+    "expected": "TC-01/02/07: Guest web and Guest/IoT isolation regression",
+    "status": "PASS"
+  },
+  {
+    "id": "RG-03",
+    "expected": "NT-03: gateway restart and full recreation; login and regression after readiness",
+    "status": "PASS"
+  }
+]

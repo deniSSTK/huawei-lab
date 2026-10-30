@@ -1,0 +1,283 @@
+Lab 17 started 2026-10-30_18-08-43 Europe/Kiev
+$ git rev-parse HEAD
+56855fd9553a88e8f9ceef42b8db6577127a92da
+exit_status=0
+$ git status --short
+ M .gitignore
+ M client/Dockerfile
+ M docker-compose.yml
+ M gateway/Dockerfile
+ M gateway/entrypoint.sh
+ M gateway/nftables.conf
+?? .dockerignore
+?? .env.example
+?? auth/
+?? evidence/lab-17/
+?? internal-site/
+?? scripts/check-auth.py
+?? scripts/init-secrets.py
+exit_status=0
+$ docker version
+Client:
+ Version:           29.4.0
+ API version:       1.54
+ Go version:        go1.26.4
+ Git commit:        9d7ad9f
+ Built:             Fri Aug  7 04:38:56 2026
+ OS/Arch:           darwin/arm64
+ Context:           orbstack
+
+Server: Docker Engine - Community
+ Engine:
+  Version:          29.4.0
+  API version:      1.54 (minimum version 1.40)
+  Go version:       go1.26.1
+  Git commit:       daa0cb7f
+  Built:            Tue Apr  7 08:35:43 2026
+  OS/Arch:          linux/arm64
+  Experimental:     true
+ containerd:
+  Version:          v2.2.2
+  GitCommit:        301b2dac98f15c27117da5c8af12118a041a31d9
+ runc:
+  Version:          1.5.1
+  GitCommit:        bb14dabeb7185bb72c8c86735d090dcb20f36587
+ docker-init:
+  Version:          0.19.0
+  GitCommit:        de40ad0
+exit_status=0
+$ docker compose version
+Docker Compose version v5.1.2
+exit_status=0
+$ docker compose config
+name: university-network
+services:
+  gateway:
+    build:
+      context: /workspace/huawei-lab
+      dockerfile: gateway/Dockerfile
+    cap_add:
+      - NET_ADMIN
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test $$(cat /proc/sys/net/ipv4/ip_forward) = 1 && nft list chain inet lab_filter forward >/dev/null && nft list chain ip lab_nat postrouting >/dev/null
+      timeout: 2s
+      interval: 2s
+      retries: 10
+    networks:
+      corporate:
+        ipv4_address: 172.28.20.254
+      guest:
+        ipv4_address: 172.28.10.254
+      iot:
+        ipv4_address: 172.28.30.254
+      management:
+        ipv4_address: 172.28.50.254
+      uplink:
+        gw_priority: 1
+        ipv4_address: 172.28.40.254
+    secrets:
+      - source: gateway_token
+        target: /run/secrets/gateway_token
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    volumes:
+      - type: bind
+        source: /workspace/huawei-lab/gateway/nftables.conf
+        target: /etc/nftables.conf
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /workspace/huawei-lab/gateway/nat.conf
+        target: /etc/nat.conf
+        read_only: true
+        bind: {}
+  guest-client:
+    build:
+      context: /workspace/huawei-lab/client
+      dockerfile: Dockerfile
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.10.254
+        exec sleep infinity
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    networks:
+      guest:
+        ipv4_address: 172.28.10.10
+  guest-peer:
+    build:
+      context: /workspace/huawei-lab/client
+      dockerfile: Dockerfile
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - ip route replace default via 172.28.10.254; exec sleep infinity
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    networks:
+      guest:
+        ipv4_address: 172.28.10.11
+  internal-site:
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.20.254
+        exec nginx -g 'daemon off;'
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    image: nginx:stable-alpine
+    networks:
+      corporate:
+        ipv4_address: 172.28.20.10
+    volumes:
+      - type: bind
+        source: /workspace/huawei-lab/internal-site/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind: {}
+  iot-client:
+    cap_add:
+      - NET_ADMIN
+    command:
+      - sh
+      - -c
+      - |
+        ip route replace default via 172.28.30.254
+        exec sleep infinity
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    image: alpine:3.22
+    networks:
+      iot:
+        ipv4_address: 172.28.30.10
+  portal:
+    build:
+      context: /workspace/huawei-lab
+      dockerfile: auth/Dockerfile
+    depends_on:
+      gateway:
+        condition: service_healthy
+        required: true
+    environment:
+      COOKIE_SECURE: "false"
+      SESSION_TTL_SECONDS: "300"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://127.0.0.1:8080/healthz
+      timeout: 2s
+      interval: 2s
+      retries: 15
+    networks:
+      guest:
+        ipv4_address: 172.28.10.20
+      management:
+        ipv4_address: 172.28.50.10
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 8080
+        published: "8080"
+        protocol: tcp
+    secrets:
+      - source: gateway_token
+        target: /run/secrets/gateway_token
+      - source: test_users
+        target: /run/secrets/test_users
+    volumes:
+      - type: volume
+        source: portal-data
+        target: /data
+        volume: {}
+networks:
+  corporate:
+    name: university-network_corporate
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.20.0/24
+          gateway: 172.28.20.1
+  guest:
+    name: university-network_guest
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.10.0/24
+          gateway: 172.28.10.1
+  iot:
+    name: university-network_iot
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.30.0/24
+          gateway: 172.28.30.1
+  management:
+    name: university-network_management
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.50.0/24
+          gateway: 172.28.50.1
+    internal: true
+  uplink:
+    name: university-network_uplink
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.40.0/24
+          gateway: 172.28.40.1
+volumes:
+  portal-data:
+    name: university-network_portal-data
+secrets:
+  gateway_token:
+    name: university-network_gateway_token
+    file: /workspace/huawei-lab/.secrets/gateway-token
+  test_users:
+    name: university-network_test_users
+    file: /workspace/huawei-lab/.secrets/test-users.json
+exit_status=0
+Test override: SESSION_TTL_SECONDS=12; default TTL=300
+$ docker compose up -d --force-recreate --wait portal
+ Container university-network-gateway-1 Running 
+ Container university-network-portal-1 Recreate 
+ Container university-network-portal-1 Recreated 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Starting 
+ Container university-network-portal-1 Started 
+ Container university-network-gateway-1 Waiting 
+ Container university-network-portal-1 Waiting 
+ Container university-network-gateway-1 Healthy 
+ Container university-network-portal-1 Healthy
+exit_status=0
+$ docker compose ps
+NAME                                 IMAGE                             COMMAND                  SERVICE         CREATED              STATUS                        PORTS
+university-network-gateway-1         university-network-gateway        "/bin/sh /usr/local/…"   gateway         About a minute ago   Up About a minute (healthy)   
+university-network-guest-client-1    university-network-guest-client   "sh -c 'ip route rep…"   guest-client    About a minute ago   Up About a minute             
+university-network-guest-peer-1      university-network-guest-peer     "sh -c 'ip route rep…"   guest-peer      About a minute ago   Up About a minute             
+university-network-internal-site-1   nginx:stable-alpine               "/docker-entrypoint.…"   internal-site   3 minutes ago        Up 3 minutes                  80/tcp
+university-network-iot-client-1      alpine:3.22                       "sh -c 'ip route rep…"   iot-client      2 days ago           Up 3 minutes                  
+university-network-portal-1          university-network-portal         "/usr/local/bin/port…"   portal          3 seconds ago        Up 2 seconds (healthy)        127.0.0.1:8080->8080/tcp
+exit_status=0

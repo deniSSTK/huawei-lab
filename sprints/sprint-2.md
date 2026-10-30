@@ -68,3 +68,7 @@ The [portal description and planned role matrix](../docs/auth-portal.ua.md) are 
 R-01 is ready within the verified Guest web scope; R-02 and R-07 are ready for the tested Corporate HTTP restrictions. R-04 has a completed description but a missing implementation; R-08 still has a gap for dynamic role-based access. Match the exact requirement wording against the team's Requirements document.
 
 After a successful smoke check, use `READY WITH KNOWN ISSUES` for network testing; use `HOLD` if the check fails. Start Lab 15 with TC-01 (Guest internet), TC-02 (Guest restriction), and TC-07 (IoT restriction). Login, role, logout and session-expiry tests remain blocked until the portal and gateway integration exist.
+
+## Lab 17 stabilization
+
+Auth Portal and timed role grants are implemented as a continuation of Sprint 2. The original freeze and Testing 1/2 evidence above remain historical records. See [current Portal documentation](../docs/auth-portal.ua.md) and `scripts/check-auth.py` for the new retest and regression workflow.

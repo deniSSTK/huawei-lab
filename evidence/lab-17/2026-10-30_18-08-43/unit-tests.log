@@ -1,0 +1,5 @@
+$ cd auth && go test -race ./...
+?   	university-lab/auth/cmd/gateway	[no test files]
+ok  	university-lab/auth/cmd/portal	20.207s
+?   	university-lab/auth/internal/control	[no test files]
+exit_status=0
